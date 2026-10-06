@@ -829,8 +829,10 @@ class ChitchatBotGUI(QMainWindow):
             cards.addWidget(c, 1)
         layout.addLayout(cards)
 
-        info = QLabel("Browser sessions save automatically on login/create. "
-                      "Banned accounts show here live. Chats / Msgs / Snaps / Pics update in real time.")
+        info = QLabel("Browser sessions save automatically on login/create and are "
+                      "refreshed while chatting (blind/expired ones are repaired with "
+                      "accounts.txt). Banned accounts show here live. "
+                      "Chats / Msgs / Snaps / Pics update in real time.")
         info.setStyleSheet(f"color: {C_TEXT_DIM}; font-size: 12px; background: transparent;")
         layout.addWidget(info)
 
@@ -1649,13 +1651,54 @@ class ChitchatBotGUI(QMainWindow):
         return accounts
 
     def load_restore_accounts(self):
+        """Load saved sessions, reporting which ones are blind (dead cookies).
+
+        Phase 13: a blind session is not returned blindly — when accounts.txt
+        holds its password the account is still offered (the bot repairs it by
+        logging in); otherwise it is skipped here with a clear message instead
+        of failing after a browser launch.
+        """
         accounts = load_saved_account_sessions()
         if not accounts:
             self.log_message("No saved sessions to restore")
             QMessageBox.warning(self, "No Sessions", "No saved account sessions found")
             return None
-        self.log_message(f"Found {len(accounts)} saved session(s)")
-        return accounts
+
+        usable, blind, skipped = [], [], []
+        for account in accounts:
+            health = account.get("health") or {}
+            if not health.get("blind"):
+                usable.append(account)
+                continue
+            blind.append(account)
+            if account.get("action") == "repair":
+                usable.append(account)      # will be repaired by a login
+            else:
+                skipped.append(account)
+
+        self.log_message(f"Found {len(accounts)} saved session(s) — "
+                         f"{len(usable)} usable, {len(blind)} blind, {len(skipped)} skipped")
+        for account in skipped:
+            self.log_message(
+                f"  ⛔ blind session skipped: {account.get('email')} "
+                f"({(account.get('health') or {}).get('reason')}) — "
+                f"add its email:password to accounts.txt to auto-repair")
+        if blind:
+            try:
+                from browser import session_health
+                self.log_message("  " + session_health.format_summary(
+                    session_health.summarize(accounts)))
+            except Exception:
+                pass
+
+        if not usable:
+            QMessageBox.warning(
+                self, "Blind Sessions",
+                "Every saved session is blind (cookies expired/empty/corrupt).\n\n"
+                "Add email:password lines to accounts.txt and the bot will log in "
+                "again automatically, or use 'Login' mode.")
+            return None
+        return usable
 
     def browse_proxy_file(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select Proxy File", "", "Text Files (*.txt);;All Files (*.*)")

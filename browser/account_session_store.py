@@ -22,7 +22,7 @@ RESTORE_ENTRY_URL = "https://app.chitchat.gg/start/new"
 
 
 def get_account_sessions_dir(base_dir=None) -> Path:
-    """Return the account-session directory below the project root."""
+    """Return the *primary* account-session directory (where saves go)."""
     if base_dir is not None:
         root = Path(base_dir)
     else:
@@ -30,6 +30,25 @@ def get_account_sessions_dir(base_dir=None) -> Path:
         # package folder this module now lives in and not Path.cwd().
         root = Path(__file__).resolve().parent.parent
     return root / ACCOUNT_SESSIONS_DIR_NAME
+
+
+def iter_session_roots(base_dir=None):
+    """Every directory that may hold saved sessions.
+
+    The bot has written sessions to both ``account_sessions/`` (this module)
+    and ``data/account_sessions/`` (context pool), and ``EVA_SESSIONS_DIR``
+    can add a third location.  Loading must look at all of them, otherwise
+    "restore my saved accounts" silently finds nothing.
+    """
+    module = _health_module()
+    if module is not None:
+        try:
+            roots = module.default_session_roots(base_dir)
+            if roots:
+                return list(roots)
+        except Exception:
+            pass
+    return [get_account_sessions_dir(base_dir)]
 
 
 def account_session_key(email: str) -> str:
@@ -200,7 +219,14 @@ def save_account_session(
 
     email = str(account.get("email") or "").strip()
     session_key = account.get("session_key") or account_session_key(email)
-    session_dir = get_account_sessions_dir(base_dir) / f"account_{session_key}"
+    # Phase 13: refresh the session *in place*.  A restored account knows its
+    # own folder (it may live in data/account_sessions/ or a custom root), so
+    # re-saving must not create a duplicate under the primary root.
+    explicit_dir = account.get("session_dir")
+    if explicit_dir:
+        session_dir = Path(explicit_dir)
+    else:
+        session_dir = get_account_sessions_dir(base_dir) / f"account_{session_key}"
     session_dir.mkdir(parents=True, exist_ok=True)
 
     storage_path = session_dir / "storage_state.json"
@@ -252,14 +278,25 @@ def _safe_session_file(session_dir: Path, filename) -> Path | None:
 
 
 def load_saved_account_sessions(base_dir=None):
-    """Discover valid saved sessions for the GUI restore mode."""
-    root = get_account_sessions_dir(base_dir)
-    if not root.is_dir():
-        return []
+    """Discover saved sessions for the GUI restore mode (all roots).
 
+    Phase 13: each account carries its session ``health`` (``state``,
+    ``blind``, ``days_left``), whether matching credentials exist
+    (``has_credentials`` — the password is attached in memory only) and the
+    recommended ``action`` (``restore`` / ``repair`` / ``skip``), so callers
+    can load, repair or skip an account without a browser launch.
+    """
     accounts = []
     seen_keys = set()
-    for metadata_path in sorted(root.glob("account_*/metadata.json")):
+    metadata_paths = []
+    for root in iter_session_roots(base_dir):
+        try:
+            if not Path(root).is_dir():
+                continue
+        except OSError:
+            continue
+        metadata_paths.extend(sorted(Path(root).glob("account_*/metadata.json")))
+    for metadata_path in metadata_paths:
         try:
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
             email = str(metadata.get("email") or "").strip()
@@ -284,21 +321,22 @@ def load_saved_account_sessions(base_dir=None):
                 continue
 
             seen_keys.add(session_key)
-            accounts.append(
-                {
-                    "email": email,
-                    "account_type": metadata.get("account_type") or "login_account",
-                    "session_key": session_key,
-                    "session_dir": str(metadata_path.parent),
-                    "storage_state_path": str(storage_path),
-                    "fingerprint_path": str(fingerprint_path) if fingerprint_path else None,
-                    "history_path": str(history_path) if history_path else None,
-                    "restore_url": metadata.get("restore_url") or RESTORE_ENTRY_URL,
-                    "saved_proxy": sanitize_proxy_config(metadata.get("proxy")),
-                    "last_url": metadata.get("last_url") or "",
-                    "restore": True,
-                }
-            )
+            account = {
+                "email": email,
+                "account_type": metadata.get("account_type") or "login_account",
+                "session_key": session_key,
+                "session_dir": str(metadata_path.parent),
+                "storage_state_path": str(storage_path),
+                "fingerprint_path": str(fingerprint_path) if fingerprint_path else None,
+                "history_path": str(history_path) if history_path else None,
+                "restore_url": metadata.get("restore_url") or RESTORE_ENTRY_URL,
+                "saved_proxy": sanitize_proxy_config(metadata.get("proxy")),
+                "last_url": metadata.get("last_url") or "",
+                "restore": True,
+                "banned": (metadata_path.parent / BANNED_FLAG_FILENAME).exists(),
+            }
+            _attach_health_and_plan(account)
+            accounts.append(account)
         except (OSError, UnicodeError, ValueError, TypeError, json.JSONDecodeError):
             # One damaged session should not prevent the remaining sessions
             # from being offered for restore.
@@ -374,10 +412,22 @@ def mark_session_banned(account, base_dir=None):
 
 
 def _iter_session_dirs(base_dir=None):
-    root = get_account_sessions_dir(base_dir)
-    if not root.is_dir():
-        return []
-    return [entry for entry in sorted(root.glob("account_*")) if entry.is_dir()]
+    """All ``account_*`` folders across every session root (deduped by name)."""
+    directories = []
+    seen = set()
+    for root in iter_session_roots(base_dir):
+        try:
+            is_dir = Path(root).is_dir()
+        except OSError:
+            is_dir = False
+        if not is_dir:
+            continue
+        for entry in sorted(Path(root).glob("account_*")):
+            if not entry.is_dir() or entry.name in seen:
+                continue
+            seen.add(entry.name)
+            directories.append(entry)
+    return directories
 
 
 def _is_session_banned(session_dir: Path) -> bool:
@@ -398,13 +448,97 @@ def _session_has_storage(session_dir: Path) -> bool:
         return False
 
 
+def _health_module():
+    """Lazy import of browser.session_health (keeps this module standalone)."""
+    try:
+        from browser import session_health
+        return session_health
+    except Exception:
+        return None
+
+
+def session_health_for(account_or_dir, warn_days=None):
+    """Health dict for a session (delegates to browser.session_health)."""
+    module = _health_module()
+    if module is None:
+        return {"state": "unknown", "blind": False, "reason": "health module unavailable"}
+    try:
+        if warn_days is None:
+            warn_days = default_warn_days()
+        return module.session_health(account_or_dir, warn_days=warn_days)
+    except Exception as exc:
+        return {"state": "unknown", "blind": False,
+                "reason": f"health check failed: {type(exc).__name__}: {exc}"}
+
+
+def default_warn_days() -> float:
+    try:
+        from core.config_loader import load_session_management
+        return float(load_session_management().get("session_expiry_warn_days", 3))
+    except Exception:
+        return 3.0
+
+
+def _attach_health_and_plan(account):
+    """Add health + repair plan (+ in-memory credentials) to an account dict."""
+    module = _health_module()
+    if module is None:
+        return account
+    try:
+        creds = module.load_credentials()
+        plan = module.plan_for_account(account, credentials=creds,
+                                       warn_days=default_warn_days())
+        account["health"] = plan.get("health") or {}
+        account["blind"] = bool(account["health"].get("blind"))
+        account["plan"] = plan
+        account["action"] = plan.get("action")
+        account["has_credentials"] = bool(plan.get("has_credentials"))
+        if plan.get("action") == "repair":
+            module.attach_credentials(account, creds)
+    except Exception:
+        account.setdefault("health", {})
+        account.setdefault("blind", False)
+    return account
+
+
 def count_alive_sessions(base_dir=None):
-    """Return the number of usable (not banned, has storage) saved sessions."""
+    """Return the number of *loadable* (not banned, live cookies) sessions.
+
+    Phase 13: an empty/corrupt/expired session no longer counts as alive — it
+    is reported by :func:`count_blind_sessions` instead, so the stock numbers
+    are honest.
+    """
+    module = _health_module()
+    if module is None:
+        alive = 0
+        for session_dir in _iter_session_dirs(base_dir=base_dir):
+            if not _is_session_banned(session_dir) and _session_has_storage(session_dir):
+                alive += 1
+        return alive
+    warn_days = default_warn_days()
     alive = 0
     for session_dir in _iter_session_dirs(base_dir=base_dir):
-        if not _is_session_banned(session_dir) and _session_has_storage(session_dir):
+        if _is_session_banned(session_dir):
+            continue
+        health = session_health_for(session_dir, warn_days=warn_days)
+        if not health.get("blind"):
             alive += 1
     return alive
+
+
+def count_blind_sessions(base_dir=None):
+    """Return the number of saved sessions whose cookies are gone/broken."""
+    module = _health_module()
+    if module is None:
+        return 0
+    warn_days = default_warn_days()
+    blind = 0
+    for session_dir in _iter_session_dirs(base_dir=base_dir):
+        if _is_session_banned(session_dir):
+            continue
+        if session_health_for(session_dir, warn_days=warn_days).get("blind"):
+            blind += 1
+    return blind
 
 
 def count_banned_sessions(base_dir=None):
@@ -449,11 +583,82 @@ def list_session_statuses(base_dir=None):
 
 
 def session_stock_summary(base_dir=None):
-    """Return a compact dict of alive/banned/total counts for live logging."""
+    """Return alive / blind / banned / total counts for live logging."""
     total = count_total_sessions(base_dir=base_dir)
     banned = count_banned_sessions(base_dir=base_dir)
     alive = count_alive_sessions(base_dir=base_dir)
-    return {"alive": alive, "banned": banned, "total": total}
+    blind = count_blind_sessions(base_dir=base_dir)
+    return {"alive": alive, "blind": blind, "banned": banned, "total": total}
+
+
+def refresh_storage_state(account, context, page=None, *, reason: str = "",
+                          extra_metadata=None, base_dir=None):
+    """Write the *current* cookies/local storage again (session keep-alive).
+
+    Called after a successful chat (throttled) so long runs keep fresh cookies
+    on disk for the next start, and blind sessions that were repaired by a
+    credential login become loadable again.  Never raises.
+    """
+    if not isinstance(account, dict):
+        return None
+    try:
+        session_dir = _session_dir_from_account(account, base_dir=base_dir)
+        if session_dir is None:
+            email = str(account.get("email") or "").strip()
+            key = account.get("session_key") or account_session_key(email)
+            session_dir = get_account_sessions_dir(base_dir) / f"account_{key}"
+        session_dir.mkdir(parents=True, exist_ok=True)
+        destination = session_dir / "storage_state.json"
+        _write_storage_state(context, destination)
+        now = datetime.now(timezone.utc).isoformat()
+        module = _health_module()
+        health = {}
+        if module is not None:
+            try:
+                health = module.session_health(session_dir, warn_days=default_warn_days())
+            except Exception:
+                health = {}
+        metadata = {
+            "last_refresh_at": now,
+            "last_verified_at": now,
+            "refresh_reason": str(reason or "keep-alive"),
+            "health": {k: v for k, v in health.items()
+                       if k not in ("info", "path", "session_dir")} or None,
+            "health_state": health.get("state"),
+            "blind": bool(health.get("blind")),
+        }
+        if page is not None:
+            try:
+                metadata["last_url"] = str(getattr(page, "url", "") or "")
+            except Exception:
+                pass
+        if extra_metadata:
+            metadata.update(extra_metadata)
+        _atomic_write_json(session_dir / "metadata.json",
+                           {**(_read_json(session_dir / "metadata.json") or {}), **metadata})
+        return session_dir
+    except Exception:
+        return None
+
+
+def _read_json(path):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def record_session_health(account, health=None, *, warn_days=None, **extra):
+    """Persist the health block for a session (delegates when available)."""
+    module = _health_module()
+    if module is None:
+        return False
+    try:
+        if health is None:
+            health = session_health_for(account, warn_days=warn_days)
+        return module.record_health(account, health, **extra)
+    except Exception:
+        return False
 
 
 def load_saved_fingerprint(account):

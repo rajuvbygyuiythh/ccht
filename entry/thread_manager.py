@@ -706,28 +706,32 @@ class ThreadManager(QObject):
             from core.account_manager import AccountManager
             from browser.context_pool import ContextPool, reset_pool
             
-            # Discover accounts from the account_sessions directory.
+            # Discover accounts from EVERY session root (account_sessions/,
+            # data/account_sessions/ and EVA_SESSIONS_DIR).  Phase 13: this is
+            # what makes "acc auto browser e load" actually find the sessions
+            # the bot saved earlier.
             self._account_manager = AccountManager()
-            sessions_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "account_sessions")
-            if not os.path.isdir(sessions_dir):
-                self.thread_log.emit(0, "[ContextPool] No 'account_sessions' directory found; using per-worker browsers")
-                return
-            
-            self._account_manager.load(sessions_dir)
+            self._account_manager.load()   # no argument = all roots
             summary = self._account_manager.summary()
             total = summary.get("total", 0)
             idle = summary.get("idle", 0)
-            
+            blind = summary.get("blind", 0)
+            repairable = summary.get("repairable", 0)
+
             if total == 0:
-                self.thread_log.emit(0, "[ContextPool] No accounts found in account_sessions/; using per-worker browsers")
+                self.thread_log.emit(0, "[ContextPool] No accounts found in any "
+                                        "account_sessions/ root; using per-worker browsers")
                 return
-            
-            self.thread_log.emit(0, f"[ContextPool] Loaded {total} accounts ({idle} idle) — activating shared-browser pool")
+
+            self.thread_log.emit(0, f"[ContextPool] Loaded {total} accounts ({idle} idle, "
+                                    f"{blind} blind{f', {repairable} repairable' if repairable else ''}) "
+                                    f"— activating shared-browser pool")
             self.thread_log.emit(0, self._account_manager.format_summary())
             
-            # Cap the pool size to the number of available accounts and the
-            # configured max_contexts.  This prevents creating empty contexts.
-            max_ctx = min(self._context_pool_max, idle, thread_count)
+            # Cap the pool size to the number of *usable* accounts and the
+            # configured max_contexts.  Blind sessions get no context.
+            usable = max(0, total - blind) + repairable
+            max_ctx = min(self._context_pool_max, max(usable, idle), thread_count)
             if max_ctx < 1:
                 max_ctx = 1
             
@@ -779,7 +783,29 @@ class ThreadManager(QObject):
             storage_state_path = account.get("storage_state_path")
             if not storage_state_path:
                 return None
-            
+
+            # Phase 13: never build a context from a blind session — it would
+            # just open an unauthenticated page.  A repairable session is
+            # allowed through: the worker logs in again inside the context.
+            try:
+                from browser import session_health as _sh
+                allowed, reason, plan = _sh.context_pool_allowed(account)
+                if not allowed:
+                    self.thread_log.emit(
+                        0,
+                        f"[ContextPool] BLIND SESSION {account.get('email', '?')} — "
+                        f"skipping ({reason})",
+                    )
+                    return None
+                if plan.get("blind"):
+                    self.thread_log.emit(
+                        0,
+                        f"[ContextPool] {account.get('email', '?')} session is blind — "
+                        f"the worker will repair it with a login",
+                    )
+            except Exception:
+                pass
+
             fingerprint = account.get("fingerprint_path")
             proxy = account.get("saved_proxy") or account.get("proxy")
             

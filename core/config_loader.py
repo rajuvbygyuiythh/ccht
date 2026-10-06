@@ -123,6 +123,25 @@ DEFAULT_SESSION_MANAGEMENT = {
     "log_alive_count_after_each_chat": False,
     # Directory name (relative to cwd) for saved account sessions.
     "sessions_dir_name": "account_sessions",
+    # ---- Phase 13: session auto-load / blind-session handling ----
+    # Verify the restored page really is the authenticated app (login form /
+    # chat UI / username), not just the URL.
+    "verify_after_restore": True,
+    # A blind session (empty/corrupt/expired cookies) is repaired by logging
+    # in again with the credentials from accounts.txt.
+    "auto_repair_blind_sessions": True,
+    "blind_fallback_to_login": True,
+    # Write the live cookies back to disk during chats (session keep-alive).
+    "session_refresh_each_chat": True,
+    "session_refresh_minutes": 10.0,
+    # Warn when the login cookie is about to expire (days).
+    "session_expiry_warn_days": 3.0,
+    # Move dead sessions to account_sessions/_dead/ (never deletes, never
+    # touches banned sessions).  Off by default — the session doctor can do
+    # it on demand.
+    "prune_dead_sessions": False,
+    # Print the health summary (alive / blind / repairable) at startup.
+    "log_health_on_start": True,
 }
 
 DEFAULT_REPLIES = {
@@ -391,13 +410,21 @@ def load_ban_detection(path=None) -> dict:
     return normalize_ban_detection(config.get("ban_detection"))
 
 
-_SESSION_BOOL = ("log_alive_count_on_start", "log_alive_count_after_each_chat")
+_SESSION_BOOL = (
+    "log_alive_count_on_start", "log_alive_count_after_each_chat",
+    "verify_after_restore", "auto_repair_blind_sessions",
+    "blind_fallback_to_login", "session_refresh_each_chat",
+    "prune_dead_sessions", "log_health_on_start",
+)
+
+_SESSION_NUMERIC = ("session_refresh_minutes", "session_expiry_warn_days")
 
 
 def normalize_session_management(section=None) -> dict:
     return _normalize_section(
         section,
         DEFAULT_SESSION_MANAGEMENT,
+        numeric_keys=_SESSION_NUMERIC,
         bool_keys=_SESSION_BOOL,
     )
 

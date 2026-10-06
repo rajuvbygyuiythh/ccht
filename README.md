@@ -83,6 +83,9 @@ data/requirements.txt` → `python -m playwright install chromium`.
 | `python test_live.py` | legacy | **44/44 passed** |
 | `python test_fuzz.py` | legacy | **4/4 passed** |
 | `python test_matcher.py` | legacy IO | **ALL CATEGORIES ROUND-TRIP OK** |
+| `python test_chat_detect.py` | legacy | **47/47 passed** |
+| `python test_selector_doctor.py` | legacy (jsdom) | **105/105 passed** |
+| `python test_session_health.py` | sessions (offline) | **152/152 passed** |
 | `python tools/live_chat.py` | flow (default) | interactive REPL |
 
 ## Project layout
@@ -200,6 +203,51 @@ Tests: `python test_selector_doctor.py` (105 checks; the jsdom pass runs the
 real extractor against the new-markup fixtures and is skipped when
 `node`/`jsdom` are missing).
 
+## Saved sessions auto-load + blind session repair (v2.4 — "session diye acc auto browser e load")
+
+Every saved session (`account_sessions/`, `data/account_sessions/`) is checked
+**before** a browser is launched, so a dead session can no longer waste a launch
+or silently fail mid-run.
+
+```bat
+:: what do my saved sessions look like right now?  (offline, no browser)
+python tools/session_doctor.py --list
+
+:: one account in detail (with the folder + the decision)
+python tools/session_doctor.py --check sadia.6.7@gmail.com --paths
+
+:: repair: add "email:password" lines to accounts.txt — the bot then re-logs
+:: in automatically whenever that session goes blind
+```
+
+| What | How it behaves |
+|------|----------------|
+| health states | `ok` · `expiring` (<3 days) · `expired` · `empty` · `corrupt` · `missing` — the last four are **blind** |
+| blind + credentials | browser opens, `login_with_account()` runs, fresh session is saved → chat continues (log: `BLIND SESSION repaired`) |
+| blind + no credentials | browser is **not** launched; log says: `add 'email:password' for this account to accounts.txt` |
+| banned session | never repaired, never downloaded — skipped as before |
+| restore check | the page is probed (chat UI / username / app text) instead of trusting the URL only |
+| long runs | cookies are re-saved after each chat (throttled, `session_refresh_minutes`) so a run does not die mid-way |
+| context pool | blind sessions get no context slot; repairable ones are let through so the worker can log in |
+| deletions | **never** — `--prune` only *moves* dead sessions to `account_sessions/_dead/` (opt-in) |
+
+Config (top-level `session_management` key in `config.json`, all optional —
+defaults are shown in `docs/SESSION_PLAN.md`):
+
+```json
+"session_management": {
+  "verify_after_restore": true,
+  "auto_repair_blind_sessions": true,
+  "session_refresh_each_chat": true,
+  "session_refresh_minutes": 10,
+  "session_expiry_warn_days": 3,
+  "prune_dead_sessions": false
+}
+```
+
+`EVA_SESSIONS_DIR` adds extra session roots (use `;` on Windows, `:` elsewhere),
+`EVA_ACCOUNTS_FILE` points at a credentials file other than `accounts.txt`.
+
 ## Changes vs the original 22.zip snapshot
 
 1. `data/input` + `data/output` renamed to direct symmetric names
@@ -212,6 +260,10 @@ real extractor against the new-markup fixtures and is skipped when
 5. Legacy test scripts pinned to `EVA_ENGINE=legacy`
 6. `data/countries.txt` added (editable country keywords)
 7. `data/output/info.txt` — Bangla guide (A to Z)
+8. **v2.4 session safety** — `browser/session_health.py`, `tools/session_doctor.py`,
+   verified restore, blind→auto-repair, keep-alive cookie refresh, honest
+   alive/blind stock counts, session columns in the account manager, and the
+   `session_management` config block (see `docs/SESSION_PLAN.md`)
 
 Everything else (browser/, entry/, core/, docs/, config/, bats) is
 unchanged from the original project.

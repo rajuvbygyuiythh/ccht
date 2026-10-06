@@ -15,8 +15,21 @@ from browser.account_session_store import (
     save_account_session,
     delete_account_session,
     mark_session_banned,
+    refresh_storage_state,
+    record_session_health,
+    session_health_for,
     session_stock_summary,
 )
+
+# Phase 13 — session auto-load / blind-session detection + repair.
+# Best-effort import: without it the bot keeps its old behaviour unchanged.
+try:
+    from browser import session_health as session_guard
+    SESSION_GUARD_AVAILABLE = True
+except Exception as _session_guard_err:  # pragma: no cover
+    session_guard = None
+    SESSION_GUARD_AVAILABLE = False
+    _SESSION_GUARD_IMPORT_ERROR = str(_session_guard_err)
 import os
 from collections import deque
 from core.config_loader import normalize_chat_timing
@@ -464,6 +477,14 @@ class ChitchatAutomation:
         self._empty_extract_polls = 0
         self._detect_warned = False
         self._heal_logged = False
+
+        # --- Phase 13: session auto-load / blind-session repair state ---
+        # "blind" = the saved cookies cannot log this account in any more.
+        self._session_blind = False
+        self._session_repair_attempted = False
+        self._session_repair_reason = ""
+        self._last_session_refresh = 0.0
+        self._session_probe_reason = ""
 
     def _launch_camoufox(self):
         """Launch the configured browser engine (Chromium or Camoufox).
@@ -991,20 +1012,44 @@ class ChitchatAutomation:
         """Save state only after the authenticated chat page was reached."""
         if not isinstance(self.account, dict) or not self.account.get("email"):
             return
+        if SESSION_GUARD_AVAILABLE and isinstance(self.account, dict) \
+                and not self.account.get("session_dir"):
+            # Recovered/legacy account without a folder: remember the folder we
+            # are about to write so later refreshes hit the same place.
+            pass
 
         try:
             session_dir = save_account_session(
                 self.account,
                 self.context,
                 page,
-                generated_fingerprint=self.generated_fingerprint or self.restore_fingerprint,
-                proxy_config=self.proxy_config,
-                history=self._navigation_history,
+                generated_fingerprint=(getattr(self, "generated_fingerprint", None)
+                                       or getattr(self, "restore_fingerprint", None)),
+                proxy_config=getattr(self, "proxy_config", None),
+                history=getattr(self, "_navigation_history", None) or [],
             )
             self.log(f"[Account] Saved browser session for {self.account['email']} to {session_dir}")
+            # Phase 13: remember when this session was verified + its health,
+            # so the GUI/tools/session doctor can see it without a launch.
+            try:
+                if SESSION_GUARD_AVAILABLE:
+                    health = session_guard.session_health(self.account)
+                    session_guard.record_health(
+                        self.account, health,
+                        last_verified_at=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                        verified_by="browser_automation",
+                    )
+                    if health.get("blind"):
+                        self._session_blind_report(health.get("reason") or "saved state is blind")
+                    else:
+                        self._session_blind = False
+            except Exception:
+                pass
             self._emit_session("ACTIVE")
+            return str(session_dir)
         except Exception as error:
             self.log(f"[Account] Warning: could not save browser session: {error}")
+            return None
 
     # ------------------------------------------------------------------ #
     #  BAN DETECTION + AUTO-CLOSE + AUTO-DELETE  (new, additive)
@@ -1108,14 +1153,43 @@ class ChitchatAutomation:
     # ------------------------------------------------------------------ #
     #  ACCOUNT STOCK / LIVE COUNT  (new, additive)
     # ------------------------------------------------------------------ #
+    def _log_session_health(self, prefix="[Session] "):
+        """Log the saved-session health summary (alive / blind / repairable)."""
+        if not SESSION_GUARD_AVAILABLE:
+            return
+        if not self._session_cfg("log_health_on_start", True):
+            return
+        try:
+            summary = session_guard.summarize()
+            self.log(f"{prefix}{session_guard.format_summary(summary)}")
+            if summary.get("blind"):
+                self.log(
+                    f"{prefix}{summary['blind']} session(s) are BLIND "
+                    f"(expired/empty/corrupt). "
+                    + (f"{summary['repairable']} can be repaired automatically with "
+                       f"the credentials in accounts.txt." if summary.get("repairable")
+                       else "add 'email:password' to accounts.txt so the bot can "
+                            "log them in again.")
+                )
+            if self._session_cfg("prune_dead_sessions", False) and summary.get("blind"):
+                result = session_guard.prune_dead_sessions(dry_run=False)
+                if result.get("count"):
+                    self.log(f"{prefix}moved {result['count']} dead session(s) to "
+                             f"account_sessions/_dead/ (files kept)")
+        except Exception as exc:
+            self.log(f"{prefix}health summary failed: {exc}")
+
     def _log_account_stock(self, prefix="[Stock] "):
         """Log how many saved accounts are alive / banned / total."""
         try:
             summary = session_stock_summary()
-            self.log(
+            line = (
                 f"{prefix}Accounts alive: {summary['alive']}  |  "
                 f"banned: {summary['banned']}  |  total saved: {summary['total']}"
             )
+            if summary.get("blind"):
+                line += f"  |  blind: {summary['blind']}"
+            self.log(line)
         except Exception as error:
             self.log(f"{prefix}Could not compute account stock: {error}")
 
@@ -2363,24 +2437,228 @@ class ChitchatAutomation:
             self.log(f"[Create] Error starting new session: {e}")
             return False
 
+    # ------------------------------------------------------------------ #
+    #  Phase 13 — session auto-load, verification, blind repair, keep-alive
+    # ------------------------------------------------------------------ #
+    def _session_cfg(self, key, default):
+        """Read a ``session_management`` option with a safe fallback."""
+        try:
+            return self.session_management_cfg.get(key, default)
+        except Exception:
+            return default
+
+    def _session_verified(self, page):
+        """Run the auth probe: is this page really an authenticated app view?"""
+        if not SESSION_GUARD_AVAILABLE:
+            # Old behaviour: only the URL is inspected.
+            try:
+                url = str(page.url or "")
+            except Exception:
+                url = ""
+            if "login" in url.lower():
+                self._session_probe_reason = "redirected to the login page"
+                return False
+            return True
+        try:
+            status, reason, _probe = session_guard.verify_page(page, wait_ms=1200)
+        except Exception as exc:
+            status, reason = None, f"probe error: {type(exc).__name__}: {exc}"
+        self._session_probe_reason = reason
+        if status is None:
+            # Cannot tell yet (still loading / SPA): retry once after a pause
+            try:
+                status, reason, _probe = session_guard.verify_page(page, wait_ms=2500)
+                self._session_probe_reason = reason
+            except Exception:
+                status = None
+        if status is None:
+            self.log(f"[Session] probe inconclusive ({reason}) — continuing carefully")
+            return True
+        return bool(status)
+
+    def _session_blind_report(self, reason=""):
+        """Record + log a blind session (grep-able 'BLIND SESSION')."""
+        self._session_blind = True
+        self._session_repair_reason = reason or self._session_probe_reason or "unverified"
+        health = {}
+        if SESSION_GUARD_AVAILABLE:
+            try:
+                health = session_guard.session_health(self.account)
+            except Exception:
+                health = {}
+        self.log(
+            f"[Session] BLIND SESSION detected for "
+            f"{self._account_label()}: {self._session_repair_reason}"
+        )
+        if health:
+            self.log(f"[Session] saved state: state={health.get('state')} "
+                     f"cookies={health.get('cookies', 0)} "
+                     f"live={health.get('live_auth_cookies', 0)} "
+                     f"days_left={health.get('days_left')}")
+        # Persist the flag so the GUI/tools can see it without a launch.
+        try:
+            record_session_health(self.account, health or None, blind=True,
+                                  blind_reason=self._session_repair_reason)
+            if isinstance(self.account, dict):
+                self.account["blind"] = True
+                self.account["health"] = health or {}
+        except Exception:
+            pass
+
+    def _account_label(self):
+        if isinstance(self.account, dict):
+            return str(self.account.get("email") or self.account.get("session_key") or "account")
+        return "account"
+
+    def _session_credentials_available(self):
+        """Attach matching accounts.txt credentials (in memory) if we can."""
+        if not SESSION_GUARD_AVAILABLE or not isinstance(self.account, dict):
+            return False
+        try:
+            session_guard.attach_credentials(self.account)
+        except Exception:
+            pass
+        return bool(self.account.get("password"))
+
+    def _repair_blind_session(self, page):
+        """Blind session + stored credentials → log in again and re-save.
+
+        This is the "acc auto browser e load hoye chat korte pare" path: instead
+        of giving up on a dead session, the account is logged in with the
+        password from ``accounts.txt`` and the fresh cookies are written back.
+        """
+        if self._session_repair_attempted:
+            return False
+        self._session_repair_attempted = True
+
+        if not self._session_cfg("auto_repair_blind_sessions", True) or \
+                not self._session_cfg("blind_fallback_to_login", True):
+            self.log("[Session] auto repair is disabled in config.json — skipping")
+            return False
+        if not self._session_credentials_available():
+            self.log(
+                f"[Session] ✗ BLIND SESSION and no credentials for "
+                f"{self._account_label()} in accounts.txt — cannot repair."
+            )
+            self.log("[Session] add 'email:password' for this account to accounts.txt "
+                     "to let the bot re-login automatically")
+            return False
+
+        self.log(f"[Session] repairing {self._account_label()} "
+                 f"by logging in with stored credentials...")
+        try:
+            if not self.login_with_account(page):
+                self.log("[Session] ✗ repair login failed — account needs manual attention")
+                return False
+        except Exception as exc:
+            self.log(f"[Session] ✗ repair login error: {type(exc).__name__}: {exc}")
+            return False
+
+        self._session_blind = False
+        self.log("[Session] ✓ BLIND SESSION repaired — fresh authenticated session")
+        try:
+            # Save the fresh cookies FIRST, then mark the session repaired, so
+            # the recorded health describes the new state (not the dead one).
+            self._save_successful_account_session(page)
+            if SESSION_GUARD_AVAILABLE:
+                session_guard.record_repaired(self.account,
+                                              repaired_reason=self._session_repair_reason)
+        except Exception as exc:
+            self.log(f"[Session] could not persist repaired session: {exc}")
+        return True
+
+    def _maybe_refresh_session(self, page, reason="keep-alive"):
+        """Write the live cookies back to disk (throttled session keep-alive)."""
+        if not isinstance(self.account, dict) or not self.account.get("email"):
+            return False
+        if self.account_mode not in ("restore", "login", "create"):
+            return False
+        if not self._session_cfg("session_refresh_each_chat", True):
+            return False
+        minutes = float(self._session_cfg("session_refresh_minutes", 10) or 0)
+        try:
+            if SESSION_GUARD_AVAILABLE and not session_guard.should_refresh(self.account, minutes):
+                return False
+        except Exception:
+            pass
+        try:
+            path = refresh_storage_state(self.account, self.context, page=page, reason=reason)
+            if path:
+                self._last_session_refresh = time.time()
+                if SESSION_GUARD_AVAILABLE:
+                    health = session_guard.session_health(self.account)
+                    if health.get("blind"):
+                        self._session_blind_report(health.get("reason") or "cookies expired")
+                return True
+        except Exception as exc:
+            self.log(f"[Session] refresh failed: {exc}")
+        return False
+
+    def _preflight_session_plan(self):
+        """Decide *before* launching whether this account is worth a browser.
+
+        Returns ``(ok, plan)``.  A blind session without credentials is skipped
+        so the thread moves to the next account instead of wasting a launch.
+        """
+        if self.account_mode != "restore" or not SESSION_GUARD_AVAILABLE:
+            return True, {}
+        if not isinstance(self.account, dict):
+            return True, {}
+        try:
+            plan = session_guard.plan_for_account(self.account)
+        except Exception:
+            return True, {}
+        state = (plan.get("health") or {}).get("state", "unknown")
+        if plan.get("action") == "skip" and plan.get("blind"):
+            self.log(f"[Session] skipping {self._account_label()}: {plan.get('reason')}")
+            return False, plan
+        if plan.get("blind") and plan.get("action") == "repair":
+            self.log(f"[Session] {self._account_label()} is blind "
+                     f"({state}) — will repair by logging in")
+        elif state == "expiring":
+            self.log(f"[Session] warning: {self._account_label()} cookies expire in "
+                     f"{(plan.get('health') or {}).get('days_left')} day(s)")
+        return True, plan
+
     def restore_saved_account_session(self, page):
-        """Open the authenticated app using the restored cookies/local storage."""
+        """Open the authenticated app using the restored cookies/local storage.
+
+        Phase 13: after opening the page the *page itself* is verified (login
+        form / chat UI / username / URL rules) instead of trusting the URL
+        alone.  An unauthenticated result is reported as a blind session so the
+        caller can repair it with a credential login.
+        """
         try:
             if not self.account or not self.account.get("storage_state_path"):
                 self.log("[Restore] ✗ Saved browser state is missing")
+                self._session_blind_report("no saved storage state")
                 return False
 
             restore_url = self.account.get("restore_url") or self.NEW_SESSION_ENTRY_URL
-            self.log(f"[Restore] Opening saved account session at {restore_url}...")
+            self.log(f"[Restore] Loading saved session for {self._account_label()} "
+                     f"at {restore_url} ...")
             page.goto(
                 restore_url,
                 timeout=30000,
                 wait_until="domcontentloaded",
             )
             self.log(f"[Restore] Current URL: {page.url}")
-            if "login" in page.url.lower():
-                self.log("[Restore] ✗ Saved session is no longer authenticated")
+
+            if not self._session_cfg("verify_after_restore", True):
+                # Legacy behaviour: URL-only decision.
+                if "login" in str(page.url).lower():
+                    self.log("[Restore] ✗ Saved session is no longer authenticated")
+                    self._session_blind_report("redirected to login")
+                    return False
+                return True
+
+            if not self._session_verified(page):
+                self.log(f"[Restore] ✗ saved session no longer authenticated "
+                         f"({self._session_probe_reason})")
+                self._session_blind_report(self._session_probe_reason
+                                           or "not authenticated after restore")
                 return False
+            self.log("[Restore] ✓ saved session verified as authenticated")
             return True
         except Exception as error:
             self.log(f"[Restore] ✗ Could not open saved account session: {error}")
@@ -2476,6 +2754,10 @@ class ChitchatAutomation:
             if self.account_mode == "restore":
                 self.log("[Step 1/3] Restoring saved account session...")
                 session_ready = self.restore_saved_account_session(page)
+                if not session_ready:
+                    # Phase 13: a blind session is not the end — if accounts.txt
+                    # holds the password we log in again and re-save the state.
+                    session_ready = self._repair_blind_session(page)
                 if not session_ready:
                     self.log("[Step 1/3] ✗ Account restore failed")
                     return False
@@ -3690,6 +3972,11 @@ class ChitchatAutomation:
                 except Exception:
                     pass
 
+            # --- Session keep-alive: refresh the saved cookies (throttled) ---
+            # Without this, long runs lose their session on the next start
+            # (cookies expire while the bot is chatting).
+            self._maybe_refresh_session(page, reason=f"after chat #{stats['total_chats']}")
+
             # --- Optional live stock update after each chat ---
             if self.session_management_cfg.get("log_alive_count_after_each_chat", False):
                 self._log_account_stock(prefix=f"[Stock] after chat #{stats['total_chats']} ")
@@ -3699,6 +3986,13 @@ class ChitchatAutomation:
             if self.is_running:
                 time.sleep(0.5)
         
+        # Final keep-alive write so the newest cookies are on disk even when
+        # the run is stopped between chats.
+        try:
+            self._maybe_refresh_session(page, reason="chat loop finished")
+        except Exception:
+            pass
+
         self.log("="*60)
         self.log(f"[Chat Bot] Session completed")
         self.log(f"  Total Chats: {stats['total_chats']}")
@@ -3901,11 +4195,25 @@ class ChitchatAutomation:
         try:
             self.set_status("Starting Chitchat.gg automation...")
             self.log("[Chitchat Bot] Starting automated session...")
+            # Phase 13: show what the saved sessions look like before launching
+            # (alive / blind / repairable) so a dead session is visible early.
+            self._log_session_health()
             if not self.is_running:
                 self.log("[Stop] Stopping...")
                 return
 
             while self.is_running:
+                # Phase 13: never launch a browser for a blind session that
+                # cannot be repaired — the thread moves to the next account.
+                try:
+                    worth_it, _plan = self._preflight_session_plan()
+                except Exception:
+                    worth_it = True
+                if not worth_it:
+                    self.log("[Session] account skipped before launch — no browser started")
+                    self.set_status("Skipped: blind session")
+                    return
+
                 try:
                     session_started = self._run_session_attempt()
                 except Exception as error:
