@@ -88,6 +88,8 @@ data/requirements.txt` → `python -m playwright install chromium`.
 | `python test_session_health.py` | sessions (offline) | **152/152 passed** |
 | `python test_browser_identity.py` | identity (offline) | **207/207 passed** |
 | `python test_thread_scheduler.py` | runtime (offline) | **93/93 passed** |
+| `python test_mock_chitchat.py` | mock site + session import | **23/23 passed** |
+| `python3 tools/e2e_mock_chat.py` | **real browser E2E** | **PASS** (see v2.7 below) |
 | `python tools/live_chat.py` | flow (default) | interactive REPL |
 
 ## Project layout
@@ -245,6 +247,54 @@ engine the GUI uses (`chat/rule_bot.py`), and the cookies are re-saved during lo
 runs so the account stays logged in for the next start.
 
 Full explanation (diagram + file-by-file table): **`docs/RUNTIME_AND_CHAT_FLOW.md`**.
+
+## Real browser end-to-end chat test (v2.7 — "acc er session diye chat kora jay?")
+
+chitchat.gg is not reachable from every machine/CI sandbox, so `tools/e2e_mock_chat.py`
+runs the **real pipeline** against a local stand-in of the site
+(`tools/mock_chitchat/`): real Chromium, the account's own Chrome profile, the
+saved cookies, the real chat reader and the real `ChatRuleBot`.  The bot keeps
+using `https://app.chitchat.gg/...` — a Playwright route hook answers those
+requests with the stand-in pages, so cookies and URL checks behave exactly like
+on the live site.
+
+```bash
+python3 tools/e2e_mock_chat.py                     # full conversation (headless, ~45 s)
+python3 tools/e2e_mock_chat.py --connect-only      # connect test only: fingerprint + session
+python3 tools/e2e_mock_chat.py --session data/account_sessions/account_xxx --visible
+python3 tools/e2e_mock_chat.py --log /tmp/e2e.log  # transcript to a file
+```
+
+A **second real browser** plays the stranger: it types a message into the same
+chat, and the test passes only when the bot's reply is rendered in that user's
+window.  Nothing is stubbed — `tools/session_chat.py` drives
+`browser/browser_automation.py` unchanged.
+
+| Check (printed at the end of a run) | Meaning |
+|-------------------------------------|---------|
+| browser launched (real Chromium) | the configured engine + `EVA_CHROMIUM_EXECUTABLE` |
+| account identity + own Chrome profile | Phase-14 device/profile reuse |
+| device fingerprint applied before the site | anti-detect layer on the context |
+| saved session imported (cookies) | `storage_state.json` → profile (`_import_storage_state`) |
+| session restored + verified by the site | `[Restore] ✓ saved session verified` |
+| the user's message detected | `[SMS] user: …` |
+| the bot replied through ChatRuleBot | `[REPLY] bot: …` |
+| reply visible in the user's browser | read from the second browser's DOM |
+
+### Using a Chrome/Chromium you already have
+
+Playwright normally downloads its own Chromium (`python -m playwright install chromium`).
+On locked-down machines (or when that download is blocked) point the bot at any
+existing binary instead:
+
+```bash
+# Windows PowerShell
+$env:EVA_CHROMIUM_EXECUTABLE="C:\Program Files\Google\Chrome\Application\chrome.exe"
+python entry\main.py
+```
+
+`EVA_CHROMIUM_EXTRA_ARGS` appends extra launch flags (e.g. `--no-sandbox` in
+containers).  Both are optional; without them the bot behaves as before.
 
 ## Separate Chrome profile per account (v2.5 — "প্রতিটা account এর আলাদা profile + fingerprint")
 

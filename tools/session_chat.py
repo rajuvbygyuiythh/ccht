@@ -170,6 +170,28 @@ def connect_only(automation, log=print):
         log("  [Identity] " + identity.describe(automation._ensure_identity()))
         page = None
         try:
+            # Persistent-profile mode: the profile context is created at launch
+            # and ``automation.context`` is only attached later by the session
+            # attempt, so pick it up from the browser handle here.
+            if automation.context is None:
+                context = getattr(browser, "_context", None)
+                if context is None:
+                    try:
+                        context = (browser.contexts or [None])[0]
+                    except Exception:
+                        context = None
+                automation.context = context
+            # The account's anti-detect layer is normally applied by the session
+            # attempt; this dry run bypasses it, so apply it here too — otherwise
+            # the fingerprint check below would compare the profile with a bare
+            # browser and report a false mismatch.
+            try:
+                from browser.browser_engine import apply_chromium_stealth
+                _kwargs, _fingerprint = automation._identity_context_options()
+                apply_chromium_stealth(automation.context, log_fn=log,
+                                       fingerprint=_fingerprint or None)
+            except Exception as error:
+                log(f"  [Identity] stealth layer not applied: {error}")
             page = automation.context.new_page()
         except Exception as error:
             return False, f"could not open a page: {error}"

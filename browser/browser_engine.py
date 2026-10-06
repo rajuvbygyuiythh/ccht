@@ -489,6 +489,13 @@ def _launch_chromium(headless, proxy, log_fn):
             "--disable-popup-blocking",          # let chat popups through
             "--lang=en-US,en",
         ]
+        # Optional: use a Chrome/Chromium the user already has instead of
+        # Playwright's download (useful on locked-down machines and servers).
+        #   EVA_CHROMIUM_EXECUTABLE=C:\Program Files\Google\Chrome\Application\chrome.exe
+        #   EVA_CHROMIUM_EXTRA_ARGS="--no-sandbox --single-process"
+        extra = str(os.environ.get("EVA_CHROMIUM_EXTRA_ARGS") or "").strip()
+        if extra:
+            launch_args.extend(part for part in extra.split() if part)
         # A realistic persistent profile dir per launch keeps cookies/storage
         # isolated but lets the browser behave like a real session (no
         # "fresh install" tells).  We use a temp dir so it's cleaned on exit.
@@ -496,6 +503,11 @@ def _launch_chromium(headless, proxy, log_fn):
             "headless": headless,
             "args": launch_args,
         }
+        executable = str(os.environ.get("EVA_CHROMIUM_EXECUTABLE") or "").strip()
+        if executable:
+            launch_kwargs["executable_path"] = executable
+            if log_fn:
+                log_fn(f"[Browser] Using the installed browser at {executable}")
         if proxy:
             launch_kwargs["proxy"] = proxy
 
@@ -553,6 +565,93 @@ class _PersistentProfile:
             pass
 
 
+_SAME_SITE_NAMES = {
+    "no_restriction": "None",
+    "none": "None",
+    "unspecified": "Lax",
+    "lax": "Lax",
+    "strict": "Strict",
+}
+
+
+def _import_storage_state(context, storage_state, log_fn=None) -> int:
+    """Import cookies/localStorage of a saved session into an open context.
+
+    ``launch_persistent_context()`` has no ``storage_state`` argument, so a
+    saved session must be applied after the profile opens.  Returns the number
+    of cookies accepted (bad entries are skipped, never fatal).
+    """
+    import json as _json
+
+    state = storage_state
+    try:
+        if isinstance(state, (str, bytes)) or hasattr(state, "__fspath__"):
+            with open(state, "r", encoding="utf-8") as handle:
+                state = _json.load(handle)
+    except Exception as exc:
+        if log_fn:
+            log_fn(f"[Browser] could not read the saved session: {exc}")
+        return 0
+    if not isinstance(state, dict):
+        return 0
+
+    imported = 0
+    cookies = []
+    for cookie in (state.get("cookies") or []):
+        if not isinstance(cookie, dict) or not cookie.get("name"):
+            continue
+        entry = dict(cookie)
+        # Chrome extensions export "no_restriction"/"unspecified"; Playwright
+        # only accepts the canonical names.  Expiry may arrive as a string.
+        raw_same_site = str(entry.get("sameSite") or "Lax").strip().lower()
+        entry["sameSite"] = _SAME_SITE_NAMES.get(raw_same_site, "Lax")
+        if "expires" in entry:
+            try:
+                entry["expires"] = float(entry["expires"])
+            except Exception:
+                entry.pop("expires", None)
+        if not entry.get("url") and not entry.get("domain"):
+            continue
+        cookies.append(entry)
+    if cookies:
+        try:
+            context.add_cookies(cookies)
+            imported = len(cookies)
+        except Exception:
+            # Retry one by one so a single bad cookie never loses the rest.
+            for entry in cookies:
+                try:
+                    context.add_cookies([entry])
+                    imported += 1
+                except Exception:
+                    continue
+
+    script_lines = []
+    for origin in (state.get("origins") or []):
+        if not isinstance(origin, dict):
+            continue
+        for item in (origin.get("localStorage") or []):
+            try:
+                name = str(item.get("name"))
+                value = str(item.get("value"))
+            except Exception:
+                continue
+            script_lines.append(
+                f"try {{ window.localStorage.setItem({_json.dumps(name)}, "
+                f"{_json.dumps(value)}); }} catch (e) {{}}"
+            )
+    if script_lines:
+        try:
+            context.add_init_script("() => {" + "".join(script_lines) + "}")
+        except Exception:
+            pass
+
+    if log_fn:
+        log_fn(f"[Browser] ✓ imported the saved session: {imported} cookie(s)"
+                + (f" + {len(script_lines)} localStorage item(s)" if script_lines else ""))
+    return imported
+
+
 def _launch_chromium_persistent(persistent_dir, headless, proxy, log_fn, context_kwargs):
     """Open a real per-account Chromium profile (survives between runs)."""
     from pathlib import Path as _Path
@@ -560,6 +659,10 @@ def _launch_chromium_persistent(persistent_dir, headless, proxy, log_fn, context
 
     profile_dir = _Path(str(persistent_dir)).expanduser()
     profile_dir.mkdir(parents=True, exist_ok=True)
+    # The identity layer writes its own bookkeeping files into the folder
+    # before the browser starts, so "used before" means Chromium's own data is
+    # there (a ``Default/`` profile), not merely "the folder is not empty".
+    profile_is_new = not (profile_dir / "Default").is_dir()
     if log_fn:
         log_fn(f"[Browser] Opening the account's own browser profile: {profile_dir}")
 
@@ -574,12 +677,30 @@ def _launch_chromium_persistent(persistent_dir, headless, proxy, log_fn, context
             "--disable-backgrounding-occluded-windows",
             "--disable-popup-blocking",
         ]
+        # Optional: use a Chrome/Chromium the user already has (see
+        # EVA_CHROMIUM_EXECUTABLE / EVA_CHROMIUM_EXTRA_ARGS above).
+        extra = str(os.environ.get("EVA_CHROMIUM_EXTRA_ARGS") or "").strip()
+        if extra:
+            launch_args.extend(part for part in extra.split() if part)
         options: Dict[str, Any] = {
             "headless": headless,
             "args": launch_args,
             "viewport": None,          # set below / by the identity
         }
         options.update({k: v for k, v in (context_kwargs or {}).items() if v is not None})
+        # launch_persistent_context() takes no ``storage_state``: keep it aside
+        # and import it right after the profile opens.  A profile that already
+        # has cookies keeps its own (newer) session — never overwrite it.
+        storage_state = options.pop("storage_state", None)
+        if storage_state and not profile_is_new:
+            if log_fn:
+                log_fn("[Browser] profile already warm — its own cookies are kept")
+            storage_state = None
+        executable = str(os.environ.get("EVA_CHROMIUM_EXECUTABLE") or "").strip()
+        if executable:
+            options["executable_path"] = executable
+            if log_fn:
+                log_fn(f"[Browser] Using the installed browser at {executable}")
         if proxy:
             options["proxy"] = proxy
         if options.get("viewport") is None:
@@ -591,6 +712,9 @@ def _launch_chromium_persistent(persistent_dir, headless, proxy, log_fn, context
         except Exception:
             pass
         raise
+
+    if storage_state:
+        _import_storage_state(context, storage_state, log_fn)
 
     proxy_browser = _PersistentProfile(context, profile_dir)
     handle = _ChromiumHandle(pw, proxy_browser)
