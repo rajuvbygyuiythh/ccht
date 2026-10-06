@@ -1,0 +1,9 @@
+# unique_sites.txt — one site per line. The bot opens ONE random site here,
+# reads/scrolls for 3-6 seconds, closes the tab, and returns to chitchat.gg.
+# Lines starting with # are ignored. Add your own site links below.
+
+https://www.youtube.com
+https://www.reddit.com
+https://en.wikipedia.org
+https://www.bbc.com
+https://edition.cnn.com

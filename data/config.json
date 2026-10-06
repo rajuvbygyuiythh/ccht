@@ -1,0 +1,172 @@
+{
+  "chat_timing": {
+    "new_chat_delay_min_seconds": 5.0,
+    "new_chat_delay_max_seconds": 8.0,
+    "rest_interval_min_minutes": 8.0,
+    "rest_interval_max_minutes": 15.0,
+    "rest_duration_min_minutes": 2.0,
+    "rest_duration_max_minutes": 3.0
+  },
+  "human_behavior": {
+    "enabled": true,
+    "reaction_pause_min_seconds": 0.5,
+    "reaction_pause_max_seconds": 1.2,
+    "typing_speed_min_cps": 6.0,
+    "typing_speed_max_cps": 12.0,
+    "read_reply_min_seconds": 1.0,
+    "read_reply_max_seconds": 3.0,
+    "micro_idle_chance": 0.25,
+    "micro_idle_min_seconds": 0.5,
+    "micro_idle_max_seconds": 2.0
+  },
+  "background_tabs": {
+    "enabled": true,
+    "urls": [],
+    "periodic_visit_enabled": true,
+    "periodic_visit_interval_min_minutes": 5.0,
+    "periodic_visit_interval_max_minutes": 10.0,
+    "periodic_visit_dwell_min_seconds": 3.0,
+    "periodic_visit_dwell_max_seconds": 6.0,
+    "periodic_visit_scroll": true,
+    "_comment": "Old persistent YouTube/Reddit/Wikipedia tabs removed. Between chats the bot opens ONE random site from data/unique_sites.txt, reads/scrolls it 3-6s (dwell above), closes the tab, and returns to chitchat.gg.",
+    "tab_open_delay_min_seconds": 2.0,
+    "tab_open_delay_max_seconds": 3.0
+  },
+  "performance": {
+    "poll_interval_seconds": 1.0,
+    "connect_poll_interval_seconds": 2.0,
+    "min_poll_interval_seconds": 0.5,
+    "evaluate_throttle_seconds": 0.5,
+    "block_resource_types": [],
+    "debug_slowdown_seconds": 0.0,
+    "browser_engine": "chromium"
+  },
+  "ban_detection": {
+    "enabled": true,
+    "ban_indicators": [
+      "banned",
+      "account has been banned",
+      "your account",
+      "suspended",
+      "permanently banned",
+      "access denied",
+      "you have been blocked"
+    ],
+    "login_redirect_is_ban": true,
+    "auto_delete_banned_session": true,
+    "auto_close_on_ban": true
+  },
+  "session_management": {
+    "log_alive_count_on_start": true,
+    "log_alive_count_after_each_chat": false,
+    "sessions_dir_name": "account_sessions"
+  },
+  "replies": {
+    "warmup_openers": [
+      "hey",
+      "hi",
+      "hello",
+      "yo",
+      "hey how are you",
+      "hi there"
+    ],
+    "warmup_chat_count_min": 2,
+    "warmup_chat_count_max": 3,
+    "warmup_messages_per_chat_min": 1,
+    "warmup_messages_per_chat_max": 2
+  },
+  "website_visits": {
+    "pre_homepage_enabled": false,
+    "pre_homepage_tab_count": 0,
+    "human_warmup_enabled": true,
+    "warmup_browse_homepage": true,
+    "warmup_scroll": true,
+    "warmup_hover_links": true,
+    "warmup_hover_link_count": 3
+  },
+  "context_pool": {
+    "max_contexts": 2,
+    "headless": true,
+    "geoip": true,
+    "humanize": true,
+    "viewport_jitter": true,
+    "block_resource_types": [],
+    "stagger_interval_seconds": 5.0,
+    "_comment": "Context-pool configuration (2026 Golden Rule). One shared browser, many isolated contexts. Adjust max_contexts based on your PC's RAM (50 = ~8GB, 100 = ~16GB)."
+  },
+  "engine_config": {
+    "enabled": true,
+    "max_workers": 2,
+    "min_workers": 1,
+    "cpu_threshold": 0.6,
+    "mem_threshold": 0.65,
+    "rate_limit_per_minute": 0,
+    "heartbeat_timeout_seconds": 180,
+    "_comment": "Go concurrency engine tuning. Thresholds lowered to 0.70/0.75 (was 0.85) so the engine reacts BEFORE the PC freezes. The Resource Governor (below) provides additional hard RAM limits."
+  },
+  "resource_governor": {
+    "enabled": true,
+    "cpu_warn": 0.6,
+    "mem_warn": 0.65,
+    "mem_recycle": 0.75,
+    "mem_redline": 0.85,
+    "min_free_mb": 1024,
+    "max_recycle_per_tick": 1,
+    "sample_interval": 3.0,
+    "kill_cooldown": 60.0,
+    "gc_interval": 120.0,
+    "restore_launch_max": 2,
+    "_comment": "Resource Governor: psutil-based tiered watchdog. Tier1 THROTTLE (yellow) freezes new launches when mem>=mem_warn. Tier2 RECYCLE (orange) closes oldest contexts when mem>=mem_recycle. Tier3 REDLINE (red) kills worst browser process when mem>=mem_redline. Lower thresholds for weaker PCs."
+  },
+  "runtime": {
+    "mode": "auto",
+    "single_browser_max": 1,
+    "multi_browser_min": 2,
+    "go_engine_enabled": false,
+    "go_engine_min_browsers": 2,
+    "js_worker_enabled": false,
+    "context_pool_enabled": true,
+    "context_pool_min_browsers": 1,
+    "governor_enabled": true,
+    "governor_kill_processes": false
+  },
+  "browser_identity": {
+    "enabled": true,
+    "profile_mode": "persistent",
+    "profiles_dir_name": "browser_profiles",
+    "unique_between_accounts": true,
+    "adopt_observed_fingerprint": true,
+    "rotate_on_ban": true,
+    "warmup_sites": [],
+    "log_identity_on_start": true,
+    "owner_guard": true,
+    "verify_before_login": true,
+    "verify_strict": false,
+    "verify_url": "",
+    "save_profile_after_login": true
+  },
+  "thread_scheduler": {
+    "enabled": true,
+    "adaptive": true,
+    "min_threads": 1,
+    "max_threads": 6,
+    "start_threads": 2,
+    "ram_per_browser_mb": 450,
+    "reserve_mb": 2048,
+    "cpu_scale_up": 0.6,
+    "mem_scale_up": 0.6,
+    "cpu_scale_down": 0.85,
+    "mem_scale_down": 0.8,
+    "pause_above": 0.9,
+    "resume_below": 0.7,
+    "pause_when_free_below_mb": 700,
+    "scale_cooldown_seconds": 45,
+    "scale_up_step": 1,
+    "scale_down_step": 1,
+    "ramp_seconds": 20,
+    "sample_interval": 3,
+    "rest_between_sessions_seconds": 0,
+    "log_interval_seconds": 60,
+    "_comment": "Adaptive thread management: adds/removes workers with CPU/RAM load and pauses all workers (browsers stay open) when the PC is under pressure. Lower max_threads for weaker PCs."
+  }
+}

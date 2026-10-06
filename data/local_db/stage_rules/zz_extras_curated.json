@@ -1,0 +1,165 @@
+{
+  "category": "extras_curated",
+  "rules": [
+    {
+      "enabled": true,
+      "priority": 300,
+      "match_type": "contains_any",
+      "questions": [
+        "ur hair looks nice",
+        "i like ur hair",
+        "i love ur hair",
+        "nice hair",
+        "love ur hair",
+        "u have nice hair",
+        "ur hair is nice",
+        "ur hair cute",
+        "pretty hair",
+        "hair looks nice"
+      ],
+      "answers": [
+        "aww i just did it today"
+      ]
+    },
+    {
+      "enabled": true,
+      "priority": 300,
+      "match_type": "contains_any",
+      "questions": [
+        "how tall are you",
+        "how tall r u",
+        "how tall are u",
+        "whats ur height",
+        "whats your height",
+        "ur tall",
+        "u tall",
+        "how tall"
+      ],
+      "answers": [
+        "i havent added that detail here",
+        "i havent added that detail"
+      ]
+    },
+    {
+      "enabled": true,
+      "priority": 300,
+      "match_type": "contains_any",
+      "questions": [
+        "do you have a girlfriend",
+        "do u have a girlfriend",
+        "do u have gf",
+        "do you have gf",
+        "have a gf",
+        "have any gf",
+        "u have a gf",
+        "u got a gf",
+        "got a gf"
+      ],
+      "answers": [
+        "no lol im single",
+        "no"
+      ]
+    },
+    {
+      "enabled": true,
+      "priority": 300,
+      "match_type": "contains_any",
+      "questions": [
+        "will you be my girlfriend",
+        "will u be my gf",
+        "will u be my girlfriend",
+        "wanna be my gf",
+        "wanna be my girlfriend",
+        "be my girlfriend",
+        "be my gf",
+        "would you date me",
+        "would u date me",
+        "u wanna date me",
+        "wanna date me",
+        "date me"
+      ],
+      "answers": [
+        "i keep things light here",
+        "hmm maybe",
+        "we'll see",
+        "maybe later",
+        "maybe keep talking",
+        "cute but talk to me more first"
+      ]
+    },
+    {
+      "enabled": true,
+      "priority": 350,
+      "match_type": "contains_any",
+      "questions": [
+        "video call naked",
+        "video call naked rn",
+        "video call naked lol",
+        "naked video call",
+        "adult video call",
+        "show me on cam",
+        "show me on cam rn",
+        "show me on cam lol",
+        "cam naked",
+        "get nude on cam"
+      ],
+      "answers": [
+        "i keep this to text chat",
+        "no adult video calls here",
+        "i dont do adult calls here"
+      ]
+    },
+    {
+      "enabled": true,
+      "priority": 350,
+      "match_type": "contains_any",
+      "questions": [
+        "hook up with me",
+        "hook up with me rn",
+        "hook up with me lol",
+        "wanna hook up",
+        "wanna hook up rn",
+        "one night stand",
+        "one night stand rn",
+        "one night stand lol",
+        "meet for sex",
+        "meet for sex rn",
+        "come over tonight",
+        "come over tonight rn"
+      ],
+      "answers": [
+        "i keep this online only"
+      ]
+    },
+    {
+      "enabled": true,
+      "priority": 350,
+      "match_type": "contains_any",
+      "questions": [
+        "i got wet",
+        "got wet",
+        "im wet",
+        "im so wet",
+        "im getting wet",
+        "so wet rn"
+      ],
+      "answers": [
+        "lol what made u say that"
+      ]
+    },
+    {
+      "enabled": true,
+      "priority": 350,
+      "match_type": "contains_any",
+      "questions": [
+        "pull my hair",
+        "pull my hair rn",
+        "pull my hair lol"
+      ],
+      "answers": [
+        "easy dont rush the vibe",
+        "lets keep it playful"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+# runtime artifacts
+__pycache__/
+*.pyc
+data/.snap_ids.idx
+data/.ask_snap.idx
+data/.share_snap.idx
+data/.snapchat.idx
+data/logs/*.log*
+.venv/
+
+# local reference copy of the uploaded snapshot zip
+_source/
+
+# selector doctor / detection artifacts (runtime)
+logs/
+config/chat_selectors.json.bak
+
+# Phase 14 — real per-account Chrome profiles (huge, machine-specific binaries)
+browser_profiles/
+data/browser_profiles/
+
+# dead sessions parked by tools/session_doctor.py --prune (never deleted)
+account_sessions/_dead/
+data/account_sessions/_dead/
+
+# identity registry lock (transient)
+account_sessions/_identities.lock
+data/account_sessions/_identities.lock
+
+# Account-local browser state can contain live authentication cookies; never commit it.
+account_sessions/
+data/account_sessions/
+**/storage_state.json
+
+# Legacy duplicate corpus; runtime reads data/unique_sites.txt instead.
+browser/unique_sites.txt
+
+# Learned per-site request templates can include auth/CSRF headers; keep local.
+data/ws_config.json
+data/ws_config.json.*
