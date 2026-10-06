@@ -1,0 +1,8166 @@
+{
+  "category": "objection",
+  "enabled": true,
+  "generated_at_utc": "2026-07-01T14:53:21.485370+00:00",
+  "compatible_with": "EvaFlow_STAGE_SEPARATE_DB_DIRECT_RUN_v2 run.py/config.json",
+  "notes": "Old CLEAN_LOCAL_REPLY_RULES_A_TO_Z rules split into stage categories. Curated short rules added with higher priority.",
+  "rules": [
+    {
+      "id": "objection_soft_001",
+      "enabled": true,
+      "priority": 210,
+      "match_type": "contains_any",
+      "questions": [
+        "fake",
+        "scam",
+        "bot",
+        "catfish",
+        "sus",
+        "proof",
+        "are you real"
+      ],
+      "answers": [
+        "lol no",
+        "yeah real, relax 😅",
+        "why so suspicious?"
+      ],
+      "cooldown_seconds": 60,
+      "category": "objection",
+      "source": "curated_short_stage_v3"
+    },
+    {
+      "id": "old_clean_00214",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot"
+      ],
+      "answers": [
+        "im eva, im here chatting with u",
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00215",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00216",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00217",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00218",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot eva"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00219",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot for me"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00220",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot if you can"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00221",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00222",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot now"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00223",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot please"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00224",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot please baby"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00225",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot pls"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00226",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot rn"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00227",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00228",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u bot?"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00443",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u real"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00446",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u real dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00449",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are u real if you can"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00602",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you ai dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00604",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you ai for me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00608",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you ai please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00611",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you ai rn"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00613",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you ai?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00647",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake"
+      ],
+      "answers": [
+        "why u think im fake",
+        "why u think that lol"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00648",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake again"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00649",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake baby"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00650",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00651",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake eva"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00652",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake for me"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00653",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake if you can"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00654",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake lol"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00655",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake now"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00656",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake please"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00657",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake please baby"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00658",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake pls"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00659",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake rn"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00660",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake tell me"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00661",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you fake?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00741",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you real"
+      ],
+      "answers": [
+        "does this sound like a bot to u",
+        "i am real",
+        "im as real as it gets",
+        "im eva, im here chatting with u",
+        "im here texting u lol. maybe ill show u more later",
+        "lol yes im real",
+        "lol yes im real baby",
+        "obviously lol why you doubting me?"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_generated_db_from_master_clean.txt",
+        "adult_replies_template.txt",
+        "basic_replies.txt",
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00742",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you real again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_00747",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "are you real if you can"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_02119",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "bot"
+      ],
+      "answers": [
+        "lol explain that a little"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_02124",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "bro you seemed fake to me"
+      ],
+      "answers": [
+        "haha yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03521",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03522",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot again"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03523",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot baby"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03524",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03525",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot eva"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03526",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot for me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03527",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot if you can"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03528",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot lol"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03529",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot now"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03530",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot please"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03531",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot please baby"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03532",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot pls"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03533",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot rn"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03534",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03535",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u bot?"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03536",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u real"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03537",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u real again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03539",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u real dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03542",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u real if you can"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03544",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u real now"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03545",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u real please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03546",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u real please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03547",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u real pls"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03550",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are u real?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03582",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you ai again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03584",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you ai dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03586",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you ai for me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03590",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you ai please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03591",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you ai please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03594",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you ai tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03608",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03609",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake again"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03610",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03611",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake dear"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03612",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake eva"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03613",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake for me"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03614",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake if you can"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03615",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03616",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake now"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03617",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake please"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03618",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03619",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake pls"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03620",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake rn"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03621",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03622",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you fake?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03675",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you real again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03679",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you real for me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03680",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you real if you can"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03683",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you real please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_03688",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "eva are you real?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06130",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "good bye"
+      ],
+      "answers": [
+        "okay i wont bother u"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06261",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06262",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot again"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06263",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06264",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06265",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot eva"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06266",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot for me"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06267",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot if you can"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06268",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot lol"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06269",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot now"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06270",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot please"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06271",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot please baby"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06272",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot pls"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06273",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot rn"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06274",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06275",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u bot?"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06276",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u real"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06279",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u real dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06280",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u real eva"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06284",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u real now"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06286",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u real please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06289",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are u real tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06322",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you ai again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06325",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you ai eva"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06327",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you ai if you can"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06330",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you ai please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06331",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you ai please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06333",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you ai rn"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06334",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you ai tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06335",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you ai?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06336",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06337",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake again"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06338",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06339",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake dear"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06340",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake eva"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06341",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake for me"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06342",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake if you can"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06343",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake lol"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06344",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake now"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06345",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake please"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06346",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake please baby"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06347",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake pls"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06348",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake rn"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06349",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06350",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you fake?"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06368",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you real baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06372",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you real if you can"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06373",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you real lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06375",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you real please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06379",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you real tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_06380",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hello are you real?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07713",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07714",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot again"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07715",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot baby"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07716",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07717",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot eva"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07718",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot for me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07719",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot if you can"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07720",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07721",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot now"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07722",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07723",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07724",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot pls"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07725",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot rn"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07726",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07727",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u bot?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07754",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u real"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07759",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u real for me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07766",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u real rn"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07767",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are u real tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07814",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you ai"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07823",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you ai please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07825",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you ai pls"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07827",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you ai tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07848",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07849",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake again"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07850",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake baby"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07851",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake dear"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07852",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake eva"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07853",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake for me"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07854",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake if you can"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07855",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07856",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake now"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07857",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07858",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake please baby"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07859",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake pls"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07860",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake rn"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07861",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07862",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you fake?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07919",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you real"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07920",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you real again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07926",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you real lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07928",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you real please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_07933",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hey are you real?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10877",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10878",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10879",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot baby"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10880",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot dear"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10881",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot eva"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10882",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot for me"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10883",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot if you can"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10884",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10885",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot now"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10886",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot please"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10887",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10888",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot pls"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10889",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot rn"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10890",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot tell me"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10891",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u bot?"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10893",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u real again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10900",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u real now"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10901",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u real please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10906",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are u real?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10938",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you ai again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10939",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you ai baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10940",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you ai dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10947",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you ai please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10949",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you ai rn"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10951",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you ai?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10952",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10953",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10954",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake baby"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10955",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake dear"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10956",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake eva"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10957",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake for me"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10958",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake if you can"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10959",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10960",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake now"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10961",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10962",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10963",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake pls"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10964",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake rn"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10965",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake tell me"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10966",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you fake?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10989",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you real lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10990",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you real now"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10992",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you real please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10993",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you real pls"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10994",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "heyy are you real rn"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12288",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12289",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12290",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot baby"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12291",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot dear"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12292",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot eva"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12293",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot for me"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12294",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot if you can"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12295",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12296",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot now"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12297",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12298",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot please baby"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12299",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot pls"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12300",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot rn"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12301",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot tell me"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12302",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u bot?"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12304",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u real again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12310",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u real lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12312",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u real please"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12317",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are u real?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12349",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you ai again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12351",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you ai dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12353",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you ai for me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12358",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you ai please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12363",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12364",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake again"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12365",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12366",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12367",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake eva"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12368",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake for me"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12369",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake if you can"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12370",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12371",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake now"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12372",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake please"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12373",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake please baby"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12374",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake pls"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12375",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake rn"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12376",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake tell me"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12377",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you fake?"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12394",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you real again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12397",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you real eva"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12398",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you real for me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_12406",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "hi are you real tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "basic_replies.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14201",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "i like you"
+      ],
+      "answers": [
+        "hi im Eva, tell me ur name",
+        "i bet u say that to everyone",
+        "i like u too",
+        "prove it",
+        "really? that's kinda sweet ngl"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_generated_db_from_master_clean.txt",
+        "adult_replies_template.txt",
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14987",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "i'm alone"
+      ],
+      "answers": [
+        "lol we both bored then"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_15014",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "i'm very alone"
+      ],
+      "answers": [
+        "lol we both bored then"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_17028",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "make u bottin"
+      ],
+      "answers": [
+        "lol i get u"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_17052",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "maybe a little just trying to light up the mood for both of us"
+      ],
+      "answers": [
+        "lol i get u"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_18980",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "r u living alone"
+      ],
+      "answers": [
+        "lol we both bored then"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_19122",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "same babe and yes babe"
+      ],
+      "answers": [
+        "haha we both bored then"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_19124",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "same her"
+      ],
+      "answers": [
+        "we both bored then lol"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_19691",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "show smth of u or bye"
+      ],
+      "answers": [
+        "okay i wont bother u"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_21181",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "sushil"
+      ],
+      "answers": [
+        "nice name sushil"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_21501",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "u are a bot"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_21936",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "u look bot"
+      ],
+      "answers": [
+        "go on im listening"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_22312",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "ur cute too"
+      ],
+      "answers": [
+        "haha we both bored then"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23726",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "why are you talking like a robot"
+      ],
+      "answers": [
+        "lol i get u"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23915",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23916",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23917",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23918",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot dear"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23919",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot eva"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23920",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot for me"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23921",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot if you can"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23922",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot lol"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23923",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot now"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23924",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot please"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23925",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23926",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot pls"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23927",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot rn"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23928",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot tell me"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23929",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u bot?"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23934",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u real eva"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23935",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u real for me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23938",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are u real now"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23979",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you ai eva"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23985",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you ai please baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23990",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23991",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake again"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23992",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake baby"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23993",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake dear"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23994",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake eva"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23995",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake for me"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23996",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake if you can"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23997",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake lol"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23998",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake now"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23999",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake please"
+      ],
+      "answers": [
+        "yes im real lol why"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_24000",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake please baby"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_24001",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake pls"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_24002",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake rn"
+      ],
+      "answers": [
+        "lol yes im real"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_24003",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_24004",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you fake?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_24021",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you real again"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_24025",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you real for me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_24026",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you real if you can"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_24027",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you real lol"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_24031",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you real pls"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_24033",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you real tell me"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_24034",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "yo are you real?"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_25312",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "you act like bot"
+      ],
+      "answers": [
+        "go on im listening"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_25360",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "you are bot"
+      ],
+      "answers": [
+        "why u think im fake"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_25537",
+      "enabled": true,
+      "priority": 92,
+      "match_type": "exact_any",
+      "questions": [
+        "you feel like a bot or smthng"
+      ],
+      "answers": [
+        "tell me something about u"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "learned_pairs.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_01187",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "baby i need u please"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_01241",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "baby i want more of you pls"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_01250",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "baby i want to be with u rn"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_01260",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "baby i want u so bad eva"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_01265",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "baby i want you bad baby"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_01272",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "baby i want your attention"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_01305",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "baby imagine us together lol"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_01348",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "baby make me feel good with words haha"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_01350",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "baby make me feel good with words pls"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_01410",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "baby say something hot ngl"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_01800",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "baby what would u do to me haha"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_01816",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "baby what would you do with me tonight"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_02107",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "be naugty with me pls"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_08852",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "hey i want you baby"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_08865",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "hey if i was with u rn baby"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_09196",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "hey say something hot"
+      ],
+      "answers": [
+        "dont rush it, build the vibe",
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10145",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "hey what if i came over ngl"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10327",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "hey what would happen if we met??"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_10343",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "hey what would you do with me rn"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14271",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i need u ngl"
+      ],
+      "answers": [
+        "keep talking like that",
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14277",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i need u??"
+      ],
+      "answers": [
+        "dont just say it, show the vibe",
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14278",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i need ur time baby"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14291",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i need you fr"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14292",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i need you haha"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14293",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i need you lol"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14301",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i need your time"
+      ],
+      "answers": [
+        "maybe u should prove it",
+        "tell me why u want me"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14629",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want more of u"
+      ],
+      "answers": [
+        "maybe i want attention too",
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14675",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want to be with u now"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14877",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want u"
+      ],
+      "answers": [
+        "do u always say things like that",
+        "i like that energy",
+        "keep talking like that",
+        "maybe i want attention too",
+        "maybe u should prove it",
+        "mmm bold i kinda like it",
+        "tell me why u want me",
+        "thats kinda sweet and dangerous"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14878",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want u baby"
+      ],
+      "answers": [
+        "do u always say things like that",
+        "keep talking like that",
+        "maybe i want attention too",
+        "maybe u should prove it",
+        "u are direct huh",
+        "u got confidence i like that"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14886",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want u eva"
+      ],
+      "answers": [
+        "maybe u should prove it",
+        "thats kinda sweet and dangerous"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14893",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want u pls"
+      ],
+      "answers": [
+        "do u always say things like that",
+        "dont just say it, show the vibe",
+        "maybe i want attention too",
+        "maybe u should prove it",
+        "tell me why u want me"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14894",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want u rn"
+      ],
+      "answers": [
+        "do u always say things like that",
+        "keep talking like that",
+        "maybe u should prove it",
+        "mmm bold i kinda like it",
+        "tell me why u want me",
+        "u are direct huh",
+        "u got confidence i like that"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14898",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want u so bad fr"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14905",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want u so bad rn"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14916",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want ur attention please"
+      ],
+      "answers": [
+        "maybe u should prove it",
+        "thats kinda sweet and dangerous"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14924",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want you bad fr"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14928",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want you bad now"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14932",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want you bad tonight"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14942",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want you pls"
+      ],
+      "answers": [
+        "maybe u should prove it",
+        "u are direct huh"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_14956",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "i want your attention rn"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_15025",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "if i was with u rn lol"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_15034",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "if we were alone"
+      ],
+      "answers": [
+        "i would see if u can make me laugh",
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_15043",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "if we were alone pls"
+      ],
+      "answers": [
+        "depends how confident u are",
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_15184",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "imagine us together"
+      ],
+      "answers": [
+        "i would see if u can make me laugh",
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_15196",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "imagine us together??"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_15855",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "like you"
+      ],
+      "answers": [
+        "i like u too",
+        "prove it",
+        "say it again"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_generated_db_from_master_clean.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_16251",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "lol i need u baby"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_16260",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "lol i need you pls"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_16300",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "lol i want to be with u ngl"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_16318",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "lol i want u so bad tonight"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_16341",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "lol if we were alone haha"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_16408",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "lol make me feel good with words"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_16477",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "lol say something hot haha"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_16842",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "lol what would u do first now"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_16998",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "make me excited eva"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_17015",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "make me feel good with words ngl"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_17894",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "ok i need your time lol"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_17940",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "ok i want more of you??"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_17957",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "ok i want u eva"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_17976",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "ok if i was with u rn now"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_17983",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "ok if we were alone pls"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_18047",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "ok make me excited??"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_18460",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "ok what would you do with me"
+      ],
+      "answers": [
+        "id probably make u prove u can behave",
+        "id want to know what u are like first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_19166",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "say something hot"
+      ],
+      "answers": [
+        "prove u can talk first",
+        "u first, make me blush"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_19170",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "say something hot haha"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_19176",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "say something hot rn"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_20117",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "so i need u haha"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_20171",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "so i want to be with u baby"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_20189",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "so i want you"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_20196",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "so i want you bad rn"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_20198",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "so i want you pls"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_20239",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "so imagine us together baby"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_20290",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "so make me feel good with words??"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_20345",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "so say something hot tonight"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_20687",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "so what if we were in bed please"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_20752",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "so what would you do with me baby"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_21239",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "talk naugty??"
+      ],
+      "answers": [
+        "prove u can talk first"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_21985",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "u make me want more??"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_22950",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "what if i came over pls"
+      ],
+      "answers": [
+        "i like slow tension first",
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_22955",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "what if we were in bed baby"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_22962",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "what if we were in bed please"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23312",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "what would u do to me lol"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23323",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "what would u do tonight haha"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23325",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "what would u do tonight ngl"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23327",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "what would u do tonight tonight"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23338",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "what would you do if i was there eva"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23356",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "what would you do tonight now"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23362",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "what would you do with me"
+      ],
+      "answers": [
+        "i would make it playful, not rushed",
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23365",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "what would you do with me fr"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_23370",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "what would you do with me please"
+      ],
+      "answers": [
+        "id probably make u prove u can behave"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    },
+    {
+      "id": "old_clean_25748",
+      "enabled": true,
+      "priority": 80,
+      "match_type": "exact_any",
+      "questions": [
+        "you make me want more eva"
+      ],
+      "answers": [
+        "maybe u should prove it"
+      ],
+      "cooldown_seconds": 15,
+      "category": "objection",
+      "source_files": [
+        "adult_unique_varied_15k_db.txt",
+        "old_database_A_to_Z"
+      ],
+      "source": "old_clean_A_to_Z"
+    }
+  ]
+}

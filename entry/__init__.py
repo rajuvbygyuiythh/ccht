@@ -1,0 +1,1 @@
+"""Entry package: thread manager and CLI runner."""

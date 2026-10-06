@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "account_key": "a273739e731d2694d4a59e7d",
+  "email": "c3dy3zbo4h@olipii.com",
+  "account_type": "login_account",
+  "saved_at": "2026-09-04T19:38:13.664788+00:00",
+  "restore_url": "https://app.chitchat.gg/start/new",
+  "storage_state": "storage_state.json",
+  "fingerprint": "fingerprint.json",
+  "history": "history.json",
+  "proxy": null,
+  "last_url": "https://app.chitchat.gg/chat/new/6a9b1d0847144cba7b800cd9"
+}

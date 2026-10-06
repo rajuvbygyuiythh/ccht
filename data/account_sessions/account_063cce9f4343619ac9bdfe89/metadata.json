@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "account_key": "063cce9f4343619ac9bdfe89",
+  "email": "sadia.6.7@gmail.com",
+  "account_type": "login_account",
+  "saved_at": "2026-09-05T19:46:46.762111+00:00",
+  "restore_url": "https://app.chitchat.gg/start/new",
+  "storage_state": "storage_state.json",
+  "fingerprint": "fingerprint.json",
+  "history": "history.json",
+  "proxy": null,
+  "last_url": "https://app.chitchat.gg/chat/new/6a9c69939f61be3d78cf3d9a"
+}

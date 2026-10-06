@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "account_key": "9001473cd2ef4d6ed8d7fdad",
+  "email": "created-session-9613d1a5b136470f",
+  "account_type": "created_session",
+  "saved_at": "2026-09-05T18:37:37.919823+00:00",
+  "restore_url": "https://app.chitchat.gg/start/new",
+  "storage_state": "storage_state.json",
+  "fingerprint": "fingerprint.json",
+  "history": "history.json",
+  "proxy": null,
+  "last_url": "https://app.chitchat.gg/chat/new"
+}
