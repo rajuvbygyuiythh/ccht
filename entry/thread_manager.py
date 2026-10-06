@@ -271,6 +271,27 @@ class ThreadManager(QObject):
             )
         except Exception:
             self._governor = None
+
+        # ---- Adaptive Thread Scheduler (Phase 15 — no PC hang / lag) ----
+        # Grows/shrinks the worker count with CPU/RAM load and pauses workers
+        # (browsers stay open) when the PC is under pressure.  Driven by tick()
+        # so it adds no threads of its own.
+        self._scheduler = None
+        self._scale_down_ids = set()
+        self._requested_thread_count = 0
+        try:
+            from core.thread_scheduler import ThreadScheduler
+            from core.config_loader import load_thread_scheduler
+            sched_cfg = load_thread_scheduler()
+            self._scheduler = ThreadScheduler(
+                config=sched_cfg,
+                log_fn=lambda msg: self.thread_log.emit(0, msg),
+                set_threads_cb=self._apply_thread_target,
+                pause_cb=self._on_scheduler_pause,
+                resume_cb=self._on_scheduler_resume,
+            )
+        except Exception:
+            self._scheduler = None
     
     @staticmethod
     def _load_file_lines(file_path):
@@ -489,6 +510,27 @@ class ThreadManager(QObject):
         )
         self._js_enabled = False
         self._use_context_pool = False
+
+        # Phase 15: tell the user what their PC can carry and clamp the request.
+        self._requested_thread_count = int(thread_count)
+        if self._scheduler is not None and self._scheduler.enabled:
+            self.thread_log.emit(0, f"[Scheduler] {self.describe_capacity()}")
+            allowed = self.recommended_thread_count(int(thread_count))
+            if allowed < int(thread_count):
+                self.thread_log.emit(
+                    0,
+                    f"[Scheduler] {thread_count} thread(s) requested but this PC is "
+                    f"comfortable with {allowed} — starting {allowed} and growing later "
+                    f"if the load allows it",
+                )
+                thread_count = allowed
+            try:
+                self._scheduler.target_threads = max(
+                    1, min(thread_count, int(self._scheduler.cfg.get("max_threads") or 6)))
+            except Exception:
+                pass
+            from core.thread_scheduler import reset_pause_gate
+            reset_pause_gate()
 
         # Hard invariant: one requested thread means one browser worker.
         # No Go supervisor, context pool, or JS worker is allowed in this mode.
@@ -1049,6 +1091,113 @@ class ThreadManager(QObject):
         except Exception:
             pass
     
+    # ------------------------------------------------------------------ #
+    #  Adaptive thread management (Phase 15)
+    # ------------------------------------------------------------------ #
+    def describe_capacity(self) -> str:
+        """One-line PC capacity plan (used at start and by tools)."""
+        try:
+            from core.thread_scheduler import capacity_plan, format_plan
+            plan = capacity_plan(
+                self._scheduler.cfg if self._scheduler is not None else None)
+            return format_plan(plan)
+        except Exception as error:
+            return f"capacity plan unavailable ({error})"
+
+    def recommended_thread_count(self, requested: int) -> int:
+        """Clamp a user-requested thread count to what this PC can carry *now*.
+
+        The scheduler may still grow the run later (up to ``max_threads``) once
+        the measured load shows there is room, so nothing is lost by starting
+        smaller — the PC simply never gets slammed at t=0.
+        """
+        try:
+            if self._scheduler is None or not self._scheduler.enabled:
+                return int(requested)
+            plan = self._scheduler.refresh_plan()
+            ceiling = max(1, int(plan.get("max_threads") or requested))
+            comfortable = max(1, int(plan.get("recommended_threads") or requested))
+            return max(1, min(int(requested), ceiling, comfortable))
+        except Exception:
+            return int(requested)
+
+    def _apply_thread_target(self, target: int, reason: str) -> None:
+        """Scheduler callback: grow/shrink the live worker set."""
+        if not self.is_running:
+            return
+        try:
+            target = int(target)
+        except (TypeError, ValueError):
+            return
+        lock = getattr(self, "account_lock", None)
+        if lock is not None:
+            lock.acquire()
+        try:
+            active = [tid for tid, w in list(self.workers.items())]
+            if target > len(active):
+                self._requested_thread_count = max(self._requested_thread_count, target)
+                for _ in range(target - len(active)):
+                    if self.accounts_exhausted:
+                        break
+                    next_id = self._next_free_thread_id()
+                    if next_id is None:
+                        break
+                    self.thread_log.emit(0, f"[Scheduler] starting thread {next_id} "
+                                            f"({reason})")
+                    # a freshly opened thread gets an unused account, exactly
+                    # like the normal restart path
+                    self._start_single_thread(next_id, force_new_account=True)
+            elif target < len(active):
+                # Ask the NEWEST workers to finish; they are not restarted.
+                for tid in sorted(active, reverse=True)[: len(active) - target]:
+                    self._scale_down_ids.add(tid)
+                    worker = self.workers.get(tid)
+                    if worker is not None:
+                        self.thread_log.emit(0, f"[Scheduler] winding down thread {tid} "
+                                                f"({reason})")
+                        try:
+                            worker.stop()
+                        except Exception:
+                            pass
+        finally:
+            if lock is not None:
+                lock.release()
+
+    def _next_free_thread_id(self):
+        """Lowest thread id that has no live worker."""
+        used = set(self.workers.keys())
+        for tid in range(1, max(10, self.thread_count) + 10):
+            if tid not in used:
+                return tid
+        return None
+
+    def _on_scheduler_pause(self, reason: str) -> None:
+        self.thread_log.emit(0, f"[Scheduler] workers paused: {reason}")
+
+    def _on_scheduler_resume(self) -> None:
+        self.thread_log.emit(0, "[Scheduler] workers resumed — load is back to normal")
+
+    def stop_thread(self, thread_id: int, *, restart: bool = False) -> None:
+        """Stop one worker without restarting it (used when scaling down)."""
+        worker = self.workers.get(thread_id)
+        if worker is None:
+            return
+        if not restart:
+            self._scale_down_ids.add(thread_id)
+        try:
+            worker.stop()
+        except Exception:
+            pass
+
+    def set_thread_count(self, target: int) -> None:
+        """Manual override used by the GUI / CLI."""
+        if self._scheduler is not None:
+            self._scheduler.target_threads = max(
+                int(self._scheduler.cfg.get("min_threads") or 1),
+                min(int(self._scheduler.cfg.get("max_threads") or 6), int(target)),
+            )
+        self._apply_thread_target(int(target), "manual override")
+
     def tick(self):
         """Periodic maintenance call (hook this into a GUI timer, ~1 s).
 
@@ -1066,6 +1215,15 @@ class ThreadManager(QObject):
         except Exception as _ge:
             try:
                 self.thread_log.emit(0, f"[governor] tick error: {_ge}")
+            except Exception:
+                pass
+        # Adaptive thread scheduler: grow/shrink workers + pause under pressure.
+        try:
+            if self._scheduler is not None and self.is_running:
+                self._scheduler.tick()
+        except Exception as _se:
+            try:
+                self.thread_log.emit(0, f"[Scheduler] tick error: {_se}")
             except Exception:
                 pass
 
@@ -1160,6 +1318,19 @@ class ThreadManager(QObject):
         if worker is not None:
             self._cleanup_worker_temp_files(worker)
             self._release_worker_pool_slot(worker)
+
+        # Phase 15: a thread the scheduler asked to wind down is simply not
+        # restarted (no need to restart what we are deliberately shrinking).
+        if thread_id in self._scale_down_ids:
+            self._scale_down_ids.discard(thread_id)
+            if thread_id in self.workers:
+                del self.workers[thread_id]
+            self.thread_finished.emit(thread_id)
+            self.thread_log.emit(0, f"[Scheduler] thread {thread_id} wound down "
+                                    f"(PC load management)")
+            if len(self.workers) == 0:
+                self.all_threads_finished.emit()
+            return
 
         # If still running, check if we should restart this thread
         if self.is_running and not self.accounts_exhausted:
@@ -1260,6 +1431,12 @@ class ThreadManager(QObject):
         """
         self.thread_log.emit(0, "Stopping all threads (clean shutdown)...")
         self.is_running = False
+        self._scale_down_ids.clear()
+        try:
+            from core.thread_scheduler import reset_pause_gate
+            reset_pause_gate()
+        except Exception:
+            pass
 
         for thread_id, worker in list(self.workers.items()):
             try:

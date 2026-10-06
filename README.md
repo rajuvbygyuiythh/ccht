@@ -87,6 +87,7 @@ data/requirements.txt` → `python -m playwright install chromium`.
 | `python test_selector_doctor.py` | legacy (jsdom) | **105/105 passed** |
 | `python test_session_health.py` | sessions (offline) | **152/152 passed** |
 | `python test_browser_identity.py` | identity (offline) | **207/207 passed** |
+| `python test_thread_scheduler.py` | runtime (offline) | **93/93 passed** |
 | `python tools/live_chat.py` | flow (default) | interactive REPL |
 
 ## Project layout
@@ -204,6 +205,47 @@ Tests: `python test_selector_doctor.py` (105 checks; the jsdom pass runs the
 real extractor against the new-markup fixtures and is skipped when
 `node`/`jsdom` are missing).
 
+## Smooth multi-browser runs + backend session→chat (v2.6)
+
+### Adaptive thread management (PC hang/leg kore na)
+
+```bat
+python tools/thread_planner.py            :: what can THIS PC carry right now?
+python tools/thread_planner.py --simulate :: the 4 load levels, no browser needed
+python tools/thread_planner.py --threads 10
+```
+
+| Situation | What the bot does |
+|-----------|-------------------|
+| CPU < 60% and RAM < 60% and free RAM ≥ budget | **adds** one browser thread (up to `max_threads`) |
+| CPU > 85% or RAM > 80% | **removes** the newest thread (it finishes its chat first) |
+| CPU/RAM > 90% or free RAM < 700 MB | **pauses every worker** — browsers stay open, work resumes automatically when the load drops |
+| start with more threads than the PC can carry | starts at the comfortable number and grows later if the load allows |
+
+Config: `data/config.json` → `thread_scheduler` (`max_threads`, `ram_per_browser_mb`,
+`reserve_mb`, `pause_above`, `resume_below`, `rest_between_sessions_seconds`, …).
+The Resource Governor (throttle / recycle / redline) stays as the last line of defence,
+and the per-account Chrome profiles mean a browser never has to be re-created to free RAM.
+
+### Backend: saved session → connect → detect SMS → reply (headless)
+
+```bat
+python tools/session_chat.py --all --plan-only              :: what would run
+python tools/session_chat.py --account EMAIL --dry-run      :: connect test
+python tools/session_chat.py --account EMAIL --minutes 30   :: run it (headless)
+python tools/session_chat.py --all --minutes 15 --visible   :: watch it work
+```
+
+Only the **saved session** is used (cookies/localStorage in `storage_state.json`
+and/or the account's own Chrome profile) — no password, no login form.  Every step
+is tagged in the log: `[Session]` `[Identity]` `[Profile]` `[Fingerprint]`
+`[Restore]` `[SMS]` `[REPLY]`.  Incoming messages are read with the multi-selector
+reader + fingerprint tracker (`browser/chat_reader.py`), replies come from the same
+engine the GUI uses (`chat/rule_bot.py`), and the cookies are re-saved during long
+runs so the account stays logged in for the next start.
+
+Full explanation (diagram + file-by-file table): **`docs/RUNTIME_AND_CHAT_FLOW.md`**.
+
 ## Separate Chrome profile per account (v2.5 — "প্রতিটা account এর আলাদা profile + fingerprint")
 
 Every account now opens **its own real Chrome profile** with **its own
@@ -318,6 +360,11 @@ defaults are shown in `docs/SESSION_PLAN.md`):
    login, profile saved after login), persistent Chromium profiles, identity
    passed into pooled contexts, `--profiles/--identities/--new-identity` tools
    and the `browser_identity` config block (see `docs/BROWSER_IDENTITY_PLAN.md`)
+10. **v2.6 smooth runtime + backend flow** — `core/thread_scheduler.py` (adaptive
+    thread count, freeze protection via the pause gate, capacity planning),
+    `entry/thread_manager.py` grow/shrink, worker-side pause between chats,
+    `tools/thread_planner.py`, `tools/session_chat.py` (session→chat runner) and
+    `docs/RUNTIME_AND_CHAT_FLOW.md`
 
 Everything else (browser/, entry/, core/, docs/, config/, bats) is
 unchanged from the original project.

@@ -1295,6 +1295,52 @@ class ChitchatAutomation:
     # ------------------------------------------------------------------ #
     #  ACCOUNT STOCK / LIVE COUNT  (new, additive)
     # ------------------------------------------------------------------ #
+    def _scheduler_cfg(self):
+        """thread_scheduler config (safe defaults when unavailable)."""
+        try:
+            from core.config_loader import load_thread_scheduler
+            return load_thread_scheduler()
+        except Exception:
+            return {}
+
+    def _wait_for_scheduler(self):
+        """Cooperate with the adaptive scheduler between chats.
+
+        When the PC is under pressure the scheduler pauses all workers; the
+        browser stays open and this returns only after the load drops (or the
+        user stops the bot).  Returns False when the worker should stop.
+        """
+        try:
+            from core.thread_scheduler import pause_gate
+            gate = pause_gate()
+            if not gate.is_paused():
+                return bool(self.is_running)
+            self.set_status("Paused (PC load)")
+            keep_going = gate.wait_if_paused(
+                stop_event=getattr(self, "_stop_event", None),
+                log_fn=self.log,
+            )
+            if self.is_running:
+                self.set_status("Running")
+            return bool(keep_going and self.is_running)
+        except Exception:
+            return bool(self.is_running)
+
+    def _inter_chat_rest(self):
+        """Optional idle pause between chats (config: rest_between_sessions_seconds)."""
+        try:
+            seconds = float((self._scheduler_cfg() or {}).get(
+                "rest_between_sessions_seconds") or 0.0)
+        except Exception:
+            seconds = 0.0
+        if seconds <= 0 or not self.is_running:
+            return
+        self.log(f"[Scheduler] resting {seconds:.0f}s before the next chat "
+                 f"(rest_between_sessions_seconds)")
+        deadline = time.monotonic() + seconds
+        while self.is_running and time.monotonic() < deadline:
+            time.sleep(0.25)
+
     def _log_session_health(self, prefix="[Session] "):
         """Log the saved-session health summary (alive / blind / repairable)."""
         if not SESSION_GUARD_AVAILABLE:
@@ -3838,6 +3884,13 @@ class ChitchatAutomation:
             if not self.is_running:
                 break
 
+            # --- Adaptive thread management (Phase 15) ---
+            # Between chats the worker asks the scheduler whether the PC can
+            # take more work.  A paused gate blocks here (browser stays open)
+            # and unblocks the moment the load drops.
+            if not self._wait_for_scheduler():
+                break
+
             # --- Browser-health heartbeat (anti-hang) ---
             # If the page crashed or the browser disconnected, break out so
             # the session restarts (or the context is recycled by the pool)
@@ -4235,6 +4288,11 @@ class ChitchatAutomation:
                 break
             if not self._maybe_take_rest(stats['total_chats']):
                 break
+            # Adaptive thread management: honour a scheduler pause (PC load)
+            # and the optional per-chat rest before opening the next user.
+            if not self._wait_for_scheduler():
+                break
+            self._inter_chat_rest()
             if not self._wait_before_new_chat(transition_reason):
                 break
 

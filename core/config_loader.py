@@ -162,6 +162,35 @@ DEFAULT_REPLIES = {
     "warmup_messages_per_chat_max": 2,
 }
 
+DEFAULT_THREAD_SCHEDULER = {
+    # Phase 15 — adaptive thread management ("PC hang/leg kore na").
+    # The scheduler watches CPU/RAM and grows/shrinks the number of browser
+    # workers, and pauses them (without closing the browsers) when the PC is
+    # under pressure.
+    "enabled": True,
+    "adaptive": True,
+    "min_threads": 1,
+    "max_threads": 6,
+    "start_threads": 2,
+    # RAM budget per browser/profile (MB) and RAM kept free for Windows + apps.
+    "ram_per_browser_mb": 450,
+    "reserve_mb": 2048,
+    "cpu_scale_up": 0.60,
+    "mem_scale_up": 0.60,
+    "cpu_scale_down": 0.85,
+    "mem_scale_down": 0.80,
+    "pause_above": 0.90,
+    "resume_below": 0.70,
+    "pause_when_free_below_mb": 700,
+    "scale_cooldown_seconds": 45,
+    "scale_up_step": 1,
+    "scale_down_step": 1,
+    "ramp_seconds": 20,
+    "sample_interval": 3,
+    "rest_between_sessions_seconds": 0,
+    "log_interval_seconds": 60,
+}
+
 DEFAULT_BROWSER_IDENTITY = {
     # Phase 14 — one account = one permanent "device profile".
     # The account always opens the SAME browser (UA, viewport, screen, hardware,
@@ -466,6 +495,41 @@ def normalize_session_management(section=None) -> dict:
 def load_session_management(path=None) -> dict:
     config = load_config(path)
     return normalize_session_management(config.get("session_management"))
+
+
+_THREAD_SCHEDULER_NUMERIC = (
+    "min_threads", "max_threads", "start_threads", "ram_per_browser_mb",
+    "reserve_mb", "cpu_scale_up", "mem_scale_up", "cpu_scale_down",
+    "mem_scale_down", "pause_above", "resume_below", "pause_when_free_below_mb",
+    "scale_cooldown_seconds", "scale_up_step", "scale_down_step", "ramp_seconds",
+    "sample_interval", "rest_between_sessions_seconds", "log_interval_seconds",
+)
+_THREAD_SCHEDULER_BOOL = ("enabled", "adaptive")
+_THREAD_SCHEDULER_PAIRS = (("min_threads", "max_threads"),)
+
+
+def normalize_thread_scheduler(section=None) -> dict:
+    """Validate the ``thread_scheduler`` section (adaptive thread management)."""
+    values = _normalize_section(
+        section,
+        DEFAULT_THREAD_SCHEDULER,
+        numeric_keys=_THREAD_SCHEDULER_NUMERIC,
+        bool_keys=_THREAD_SCHEDULER_BOOL,
+        pair_keys=_THREAD_SCHEDULER_PAIRS,
+    )
+    values["min_threads"] = max(1, int(values["min_threads"]))
+    values["max_threads"] = max(values["min_threads"], int(values["max_threads"]))
+    values["start_threads"] = max(values["min_threads"],
+                                  min(values["max_threads"], int(values["start_threads"])))
+    values["scale_up_step"] = max(1, int(values["scale_up_step"]))
+    values["scale_down_step"] = max(1, int(values["scale_down_step"]))
+    return values
+
+
+def load_thread_scheduler(path=None) -> dict:
+    """Load the adaptive thread-management settings."""
+    config = load_config(path)
+    return normalize_thread_scheduler(config.get("thread_scheduler"))
 
 
 _BROWSER_IDENTITY_BOOL = (

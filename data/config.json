@@ -144,5 +144,29 @@
     "verify_strict": false,
     "verify_url": "",
     "save_profile_after_login": true
+  },
+  "thread_scheduler": {
+    "enabled": true,
+    "adaptive": true,
+    "min_threads": 1,
+    "max_threads": 6,
+    "start_threads": 2,
+    "ram_per_browser_mb": 450,
+    "reserve_mb": 2048,
+    "cpu_scale_up": 0.6,
+    "mem_scale_up": 0.6,
+    "cpu_scale_down": 0.85,
+    "mem_scale_down": 0.8,
+    "pause_above": 0.9,
+    "resume_below": 0.7,
+    "pause_when_free_below_mb": 700,
+    "scale_cooldown_seconds": 45,
+    "scale_up_step": 1,
+    "scale_down_step": 1,
+    "ramp_seconds": 20,
+    "sample_interval": 3,
+    "rest_between_sessions_seconds": 0,
+    "log_interval_seconds": 60,
+    "_comment": "Adaptive thread management: adds/removes workers with CPU/RAM load and pauses all workers (browsers stay open) when the PC is under pressure. Lower max_threads for weaker PCs."
   }
 }
