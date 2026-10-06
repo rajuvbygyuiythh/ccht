@@ -88,7 +88,7 @@ data/requirements.txt` → `python -m playwright install chromium`.
 | `python test_session_health.py` | sessions (offline) | **152/152 passed** |
 | `python test_browser_identity.py` | identity (offline) | **207/207 passed** |
 | `python test_thread_scheduler.py` | runtime (offline) | **93/93 passed** |
-| `python test_mock_chitchat.py` | mock site + session import | **23/23 passed** |
+| `python test_mock_chitchat.py` | mock site + session import + debug layer | **54/54 passed** |
 | `python3 tools/e2e_mock_chat.py` | **real browser E2E** | **PASS** (see v2.7 below) |
 | `python tools/live_chat.py` | flow (default) | interactive REPL |
 
@@ -280,6 +280,29 @@ window.  Nothing is stubbed — `tools/session_chat.py` drives
 | the user's message detected | `[SMS] user: …` |
 | the bot replied through ChatRuleBot | `[REPLY] bot: …` |
 | reply visible in the user's browser | read from the second browser's DOM |
+
+### Debugging a run (`--debug`)
+
+```bash
+python3 tools/e2e_mock_chat.py --debug                    # everything traced
+python3 tools/e2e_mock_chat.py --debug --artifacts /tmp/art
+python3 tools/e2e_mock_chat.py --no-artifacts             # never write files
+python3 tools/e2e_mock_chat.py --hard-timeout 120         # absolute safety stop
+```
+
+| What `--debug` adds | Where it shows up |
+|---------------------|-------------------|
+| every API call the pages make (`/api/messages`, `/api/send`, greeting) | `[MockAPI] …` lines in the log |
+| DOM snapshot of **both** browsers every 2 s (bubbles, last message, input, connection state) | `[DEBUG] [dom] bot: …` / `user: …` |
+| page console, JS errors, failed requests and every network request | `[DEBUG] [bot]/[user] console|pageerror|requestfailed` |
+| artifacts kept even when the run passes | `--artifacts` folder (`SUMMARY.txt`, `bot_page.html`, `*_screenshot.png`, `events_*.log`, `network.log`, `dom_trace.log`, `mock_api.log`, `transcript.json`, `cookies.json`) |
+
+A **failing** run always writes artifacts (even without `--debug`) and prints a
+`what to look at` section: every failed check gets concrete hints (which file,
+which log line, which selector to inspect). The log file keeps the `[DEBUG]`
+lines even when the terminal stays quiet, stdout being closed early
+(`… | head`) can no longer kill a run, and `--hard-timeout` guarantees an
+exit with artifacts instead of a hung browser call.
 
 ### Using a Chrome/Chromium you already have
 

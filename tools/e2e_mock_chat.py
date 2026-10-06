@@ -31,6 +31,7 @@ import signal
 import sys
 import threading
 import time
+import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -48,28 +49,289 @@ CHAT_URL = "https://app.chitchat.gg/chat/"
 # --------------------------------------------------------------------------- #
 
 class RunLog:
-    """Timestamped log that also mirrors every line to a file."""
+    """Timestamped log that also mirrors every line to a file.
 
-    def __init__(self, path: Path):
+    ``--debug`` adds a second channel: :meth:`debug` lines are always written to
+    the log file (so a failure can be inspected afterwards) but only printed to
+    the terminal when debugging is on.
+    """
+
+    def __init__(self, path: Path, debug: bool = False):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._file = open(self.path, "a", encoding="utf-8")
         self._lock = threading.Lock()
         self.lines = []
+        self.debug_enabled = bool(debug)
+        self.debug_lines = []
+        self.stdout_broken = False
 
-    def __call__(self, message: str) -> None:
-        line = f"[{datetime.now().strftime('%H:%M:%S')}] {message}"
+    def _write(self, line: str, to_stdout: bool = True) -> None:
         with self._lock:
             self.lines.append(line)
-            print(line, flush=True)
             self._file.write(line + "\n")
             self._file.flush()
+        if to_stdout and not self.stdout_broken:
+            try:
+                print(line, flush=True)
+            except (BrokenPipeError, OSError, ValueError):
+                # e.g. the output was piped into `head` and the reader is gone.
+                # Never let logging break the run: the file keeps everything.
+                self.stdout_broken = True
+
+    def __call__(self, message: str) -> None:
+        self._write(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
+
+    def debug(self, message: str) -> None:
+        line = f"[{datetime.now().strftime('%H:%M:%S')}] [DEBUG] {message}"
+        with self._lock:
+            self.debug_lines.append(line)
+        self._write(line, to_stdout=self.debug_enabled)
+
+    def tail(self, count: int = 80) -> str:
+        with self._lock:
+            return "\n".join(self.lines[-count:])
 
     def close(self):
         try:
             self._file.close()
         except Exception:
             pass
+
+
+# --------------------------------------------------------------------------- #
+#  debugging: what to look at when a check fails
+# --------------------------------------------------------------------------- #
+
+DIAGNOSIS = {
+    "browser launched (real Chromium)": [
+        "look at [Browser] lines: is EVA_CHROMIUM_EXECUTABLE correct and executable?",
+        "run: python3 tools/e2e_mock_chat.py --connect-only --debug",
+    ],
+    "account identity + own Chrome profile": [
+        "look at [Identity] lines; a registry/owner conflict shows up there",
+        "check EVA_PROFILES_DIR is writable",
+    ],
+    "device fingerprint applied before the site": [
+        "the stealth line comes from browser/browser_engine.py apply_chromium_stealth()",
+        "if missing: the engine is not chromium (browser_engine in data/config.json)",
+    ],
+    "saved session imported (cookies)": [
+        "look at [Browser] ✓ imported the saved session: N cookie(s)",
+        "if 0: storage_state.json in the session dir is empty/corrupt",
+    ],
+    "session restored + verified by the site": [
+        "look at [Restore] lines and the route-hook cookie count (how many cookies were sent)",
+        "a redirect to /login means the saved cookies are dead",
+    ],
+    "chat page opened for the account": [
+        "the page never reached /chat/ — see bot_page.html in the artifacts",
+        "check [MockSite] lines for the last document the browser loaded",
+    ],
+    "the user's message detected": [
+        "look for [SMS]/Stranger: lines in the log and 'bubbles=' in the DOM traces",
+        "if the DOM shows the bubble but nothing was detected: browser/chat_reader.py selectors",
+        "if the DOM shows no bubble: the page's own /api/messages polling is stuck",
+    ],
+    "the bot replied through ChatRuleBot": [
+        "look for 'ChatRuleBot reply:' (engine) or a FAILED line (then it fell back)",
+        "typing/sending errors show up as 'Failed to send' from send_chat_message()",
+    ],
+    "reply visible in the user's browser": [
+        "the reply left the bot but never reached the user's DOM",
+        "compare the transcript in transcript.json with user_page.html",
+    ],
+    "no user-side error": [
+        "user_events.log has the console/pageerror/requestfailed lines",
+        "user_screenshot.png shows what the user's browser displayed",
+    ],
+}
+
+
+def diagnose(checks: dict, stranger_error: str = "") -> list:
+    """Turn the check table into concrete 'look here' hints."""
+    hints = []
+    for name, ok in checks.items():
+        if ok:
+            continue
+        hints.append(f"✗ {name}")
+        for line in DIAGNOSIS.get(name, ["no hint recorded for this check"]):
+            hints.append(f"    · {line}")
+    if stranger_error:
+        hints.append(f"  user-side exception: {stranger_error}")
+    return hints
+
+
+def format_state(where: str, state: dict) -> str:
+    """One compact line describing what a page is showing."""
+    if not state:
+        return f"{where}: <no state>"
+    return (f"{where}: path={state.get('path')} bubbles={state.get('bubbles')} "
+            f"last={str(state.get('last'))[:70]!r} input={str(state.get('input'))[:40]!r} "
+            f"connected={str(state.get('connected'))[:45]!r} ended={state.get('ended')}")
+
+
+class DebugRecorder:
+    """Collects browser diagnostics and writes them to an artifact folder.
+
+    Playwright's sync objects belong to the thread that created them, so the
+    bot's page is only ever touched from the bot's own thread (the automation
+    calls :meth:`capture_page` from ``_close_camoufox``) — everything else is
+    either an event listener (fires on the owning thread) or telemetry the page
+    pushes to the mock backend itself.
+    """
+
+    def __init__(self, *, artifacts_dir: Path, log: RunLog, enabled: bool = False):
+        self.root = Path(artifacts_dir)
+        self.log = log
+        self.enabled = bool(enabled)
+        self.dir: Path = None
+        self._lock = threading.Lock()
+        self.events = {"bot": [], "user": []}
+        self.network = []
+        self.pages = {"bot": None, "user": None}
+        self.captured = {}
+
+    # -- live capture -----------------------------------------------------
+    def watch(self, page, where: str) -> None:
+        """Attach console/error/network listeners to a page (owning thread)."""
+        with self._lock:
+            self.pages[where] = page
+        try:
+            page.on("console", lambda m: self.record(where, "console", f"{m.type}: {m.text[:300]}"))
+            page.on("pageerror", lambda e: self.record(where, "pageerror", str(e)[:600]))
+            page.on("requestfailed",
+                    lambda r: self.record(where, "requestfailed", f"{r.url} → {r.failure}"))
+            page.on("framenavigated",
+                    lambda f: self.record(where, "nav", str(f.url)[:200]))
+            page.on("request", lambda r: self._network(where, r))
+        except Exception as error:
+            self.record(where, "watch-error", str(error))
+
+    def _network(self, where: str, request) -> None:
+        try:
+            line = f"{where} {request.method} {request.url}"
+            with self._lock:
+                self.network.append(line)
+            if self.enabled:
+                self.log.debug(f"[net] {line}")
+        except Exception:
+            pass          # a listener must never raise into Playwright
+
+    def record(self, where: str, kind: str, text: str) -> None:
+        try:
+            line = f"{kind}: {text}"
+            with self._lock:
+                self.events.setdefault(where, []).append(line)
+            self.log.debug(f"[{where}] {line}")
+        except Exception:
+            pass
+
+    # -- artifacts --------------------------------------------------------
+    def capture_page(self, page, where: str) -> dict:
+        """Screenshot + DOM of one page. MUST run on the page's own thread."""
+        result = {"where": where, "ok": False, "html": "", "screenshot": ""}
+        if page is None:
+            return result
+        try:
+            if page.is_closed():
+                self.log.debug(f"[artifacts] {where}: page is already closed — skipped")
+                return result
+        except Exception:
+            pass
+        try:
+            target = self.ensure_dir()
+        except Exception as error:
+            self.log.debug(f"[artifacts] {where}: {error}")
+            return result
+        try:
+            html = page.content()
+            path = target / f"{where}_page.html"
+            path.write_text(html, encoding="utf-8")
+            result["html"] = str(path)
+            result["ok"] = True
+        except Exception as error:
+            self.record(where, "dump-error", f"content(): {error}")
+        try:
+            path = target / f"{where}_screenshot.png"
+            page.screenshot(path=str(path), timeout=15000)
+            result["screenshot"] = str(path)
+        except Exception as error:
+            self.record(where, "dump-error", f"screenshot(): {error}")
+        with self._lock:
+            self.captured[where] = result
+        self.log.debug(f"[artifacts] {where}: {result['html']} {result['screenshot']}")
+        return result
+
+    def ensure_dir(self) -> Path:
+        with self._lock:
+            if self.dir is None:
+                stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                self.dir = self.root / stamp
+                self.dir.mkdir(parents=True, exist_ok=True)
+            return self.dir
+
+    def dump(self, *, backend=None, checks: dict = None, reason: str = "",
+             results: dict = None) -> Path:
+        """Write everything we know to the artifact folder (never raises)."""
+        target = self.ensure_dir()
+        try:
+            (target / "events_bot.log").write_text(
+                "\n".join(self.events.get("bot") or ["<none>"]) + "\n", encoding="utf-8")
+            (target / "events_user.log").write_text(
+                "\n".join(self.events.get("user") or ["<none>"]) + "\n", encoding="utf-8")
+            (target / "network.log").write_text(
+                "\n".join(self.network or ["<none>"]) + "\n", encoding="utf-8")
+        except Exception as error:
+            self.log.debug(f"[artifacts] write failed: {error}")
+
+        if backend is not None:
+            try:
+                (target / "transcript.json").write_text(
+                    json.dumps(backend.all(), indent=2, ensure_ascii=False), encoding="utf-8")
+                (target / "mock_api.log").write_text(
+                    "\n".join(backend.trace_tail()) + "\n", encoding="utf-8")
+                states = []
+                for entry in backend.states:
+                    states.append(format_state(str(entry.get("where")), entry))
+                (target / "dom_trace.log").write_text(
+                    "\n".join(states or ["<no page telemetry>"]) + "\n", encoding="utf-8")
+                for who, html in (backend.dumped_html or {}).items():
+                    safe = str(who).replace("/", "_").replace(" ", "_")
+                    (target / f"dom_from_page_{safe}.html").write_text(
+                        str(html or ""), encoding="utf-8")
+                (target / "cookies.json").write_text(
+                    json.dumps(backend.cookie_seen or {}, indent=2, ensure_ascii=False),
+                    encoding="utf-8")
+            except Exception as error:
+                self.log.debug(f"[artifacts] backend dump failed: {error}")
+
+        summary = ["E2E chat test artifacts", "=" * 72, f"reason: {reason or 'n/a'}", ""]
+        if checks:
+            summary.append("checks:")
+            for name, ok in checks.items():
+                summary.append(f"  {'✓' if ok else '✗'} {name}")
+            summary.append("")
+            hints = diagnose(checks, reason if reason.startswith(("Timeout", "Runtime")) else "")
+            if hints:
+                summary.append("what to look at:")
+                summary.extend(hints)
+                summary.append("")
+        if results:
+            summary.append("results:")
+            summary.extend(f"  {k}: {v}" for k, v in results.items())
+            summary.append("")
+        summary.append("files in this folder:")
+        for item in sorted(target.iterdir()) if target.is_dir() else []:
+            summary.append(f"  {item.name}")
+        summary.append("")
+        summary.append("last log lines:")
+        summary.append(self.log.tail(80))
+        try:
+            (target / "SUMMARY.txt").write_text("\n".join(summary), encoding="utf-8")
+        except Exception as error:
+            self.log.debug(f"[artifacts] summary failed: {error}")
+        return target
 
 
 # --------------------------------------------------------------------------- #
@@ -134,7 +396,7 @@ class StrangerBrowser(threading.Thread):
     """A real Chromium that types messages at the mock site and reads replies."""
 
     def __init__(self, *, backend, api_base, bot_name, log, done_event,
-                 name="Stranger42", start_event=None):
+                 name="Stranger42", start_event=None, debug=False, recorder=None):
         super().__init__(name="stranger-browser", daemon=True)
         self.backend = backend
         self.api_base = api_base
@@ -145,7 +407,11 @@ class StrangerBrowser(threading.Thread):
         self.name = name
         self.replies = []
         self.error = ""
+        self.traceback = ""
         self.finished = threading.Event()
+        self.debug = bool(debug)
+        self.recorder = recorder
+        self.page = None
 
     # -- helpers ---------------------------------------------------------
     def _launch(self):
@@ -166,8 +432,10 @@ class StrangerBrowser(threading.Thread):
         context = browser.new_context(viewport={"width": 1280, "height": 900},
                                       locale="en-US")
         routes.install(context, self.backend, me=self.name, api_base="",
-                       log=self.log)
+                       log=self.log, debug=self.debug)
         page = context.new_page()
+        if self.recorder is not None:
+            self.recorder.watch(page, "user")
         return pw, browser, context, page
 
     def _bubbles_from(self, page, author):
@@ -223,18 +491,25 @@ class StrangerBrowser(threading.Thread):
             self.log(f"[Stranger] got reply #2 from {self.bot_name}: {self.replies[-1]}")
         except Exception as error:
             self.error = f"{type(error).__name__}: {error}"
+            self.traceback = traceback.format_exc()
             self.log(f"[Stranger] ✗ {self.error}")
+            if self.debug:
+                self.log.debug("[user] traceback:\n" + self.traceback)
         finally:
             self.done_event.set()
             self.finished.set()
             if page is not None:
                 try:
                     page.screenshot(path=str(Path("/tmp/e2e_stranger_last.png")))
-                    self.log("[Stranger] screenshot of the user's window: "
-                             "/tmp/e2e_stranger_last.png")
+                    self.log(f"[Stranger] screenshot of the user's window: "
+                             f"/tmp/e2e_stranger_last.png")
                 except Exception:
                     pass
+            if self.recorder is not None and page is not None:
+                # The user's page belongs to this thread — capture it here.
+                self.recorder.capture_page(page, "user")
             try:
+                self.page = page
                 browser.close()
                 pw.stop()
             except Exception:
@@ -262,11 +537,28 @@ def main() -> int:
                         help="show the user's browser window")
     parser.add_argument("--connect-only", action="store_true",
                         help="only prove the session connects (no conversation)")
+    parser.add_argument("--debug", action="store_true",
+                        help="trace every API call, page console line and network "
+                             "request, print DOM state every 2 s and always keep "
+                             "the artifacts (screenshots + page HTML + traces)")
+    parser.add_argument("--artifacts", default="/home/user/e2e_artifacts",
+                        help="folder for the debug/failure artifacts")
+    parser.add_argument("--no-artifacts", action="store_true",
+                        help="never write artifacts (even when a check fails)")
+    parser.add_argument("--debug-interval", type=float, default=2.0,
+                        help="seconds between DOM state traces in --debug")
+    parser.add_argument("--hard-timeout", type=float, default=0.0,
+                        help="absolute safety stop in seconds (0 = minutes*60+150); "
+                             "artifacts are written before exiting")
     args = parser.parse_args()
 
-    log = RunLog(Path(args.log))
+    log = RunLog(Path(args.log), debug=args.debug)
+    recorder = DebugRecorder(artifacts_dir=Path(args.artifacts), log=log,
+                             enabled=args.debug)
     log("=" * 72)
     log("[E2E] saved account session → real browser → chat with a user")
+    if args.debug:
+        log("[E2E] DEBUG mode: API/console/network traces + DOM snapshots + artifacts")
     log("=" * 72)
 
     work_dir = Path("/tmp/eva_e2e_sessions")
@@ -334,9 +626,38 @@ def main() -> int:
             if context is not None:
                 routes.install(
                     context, backend, me=bot_name, api_base="", log=log,
+                    debug=args.debug,
                     on_page=lambda path, who: log(f"[MockSite] bot browser loaded {path}"))
                 log("[MockSite] ✓ route hook installed on the account's browser context")
+                # Watch every page this account opens (console/errors/network).
+                # Listeners fire on the automation's own thread, so this is safe.
+                try:
+                    for page in list(context.pages):
+                        recorder.watch(page, "bot")
+                    context.on("page", lambda page: recorder.watch(page, "bot"))
+                except Exception as error:
+                    log(f"[DEBUG] could not watch the bot's pages: {error}")
             return browser
+
+        def _close_camoufox(self):
+            """Capture the bot's page (owning thread!) before the browser goes."""
+            try:
+                page = None
+                pages = []
+                try:
+                    pages = list(getattr(self.context, "pages", []) or [])
+                except Exception:
+                    pages = []
+                for candidate in pages:
+                    try:
+                        if "/chat" in str(candidate.url):
+                            page = candidate
+                    except Exception:
+                        continue
+                recorder.capture_page(page or (pages[-1] if pages else None), "bot")
+            except Exception as error:
+                log(f"[DEBUG] bot page capture failed: {error}")
+            return super()._close_camoufox()
 
     automation_module.ChitchatAutomation = MockChitchatAutomation
 
@@ -365,6 +686,14 @@ def main() -> int:
         log("=" * 72)
         log(f"[E2E] connect-only result: ok={ok} · {reason}")
         log("=" * 72)
+        if not args.no_artifacts and (args.debug or not ok):
+            try:
+                target = recorder.dump(
+                    backend=backend, checks={"session restored": bool(ok)},
+                    reason=reason, results={"log": str(log.path)})
+                log(f"[E2E] artifacts: {target}")
+            except Exception as error:
+                log(f"[E2E] artifact dump failed: {error}")
         automation_module.ChitchatAutomation = original_cls
         try:
             server.shutdown()
@@ -373,10 +702,57 @@ def main() -> int:
         log.close()
         return 0 if ok else 1
 
+    stop_all = threading.Event()
+
+    # Absolute safety net: a debug run must never hang forever.  When the limit
+    # is reached the artifacts are written and the process exits with code 2.
+    hard_limit = float(args.hard_timeout) if args.hard_timeout else (args.minutes * 60 + 150)
+
+    def hard_stop():
+        if hard_limit <= 0 or stop_all.wait(hard_limit):
+            return
+        try:
+            log(f"[E2E] ✗ hard timeout ({hard_limit:.0f}s) reached — writing artifacts "
+                f"and exiting (a browser call is stuck)")
+            log(f"[E2E] last DOM states: " + " | ".join(
+                format_state("page", e) for e in list(backend.states)[-2:]))
+            target = recorder.dump(backend=backend,
+                                   reason=f"hard timeout after {hard_limit:.0f}s",
+                                   results={"log": str(log.path)})
+            log(f"[E2E] artifacts: {target}")
+        except Exception as error:
+            log(f"[E2E] artifact dump failed: {error}")
+        log.close()
+        os._exit(2)
+
+    threading.Thread(target=hard_stop, name="e2e-hard-stop", daemon=True).start()
+
+    # The pages push their own DOM state to the mock backend; this thread just
+    # reads that (plain Python, no Playwright cross-thread calls).
+    def state_watcher():
+        seen = 0
+        while not stop_all.is_set():
+            stop_all.wait(max(0.5, float(args.debug_interval) / 2.0))
+            try:
+                states = list(backend.states)
+            except Exception:
+                continue
+            for entry in states[seen:]:
+                seen += 1
+                where = "bot" if str(entry.get("author")) == bot_name else "user"
+                log.debug("[dom] " + format_state(where, entry))
+
+    if args.debug:
+        backend.request_dump(bot_name)          # the bot's DOM, for the artifacts
+
     done_event = threading.Event()
     stranger = StrangerBrowser(backend=backend, api_base=api_base, bot_name=bot_name,
-                               log=log, done_event=done_event, name=site.STRANGER_NAME)
+                               log=log, done_event=done_event, name=site.STRANGER_NAME,
+                               debug=args.debug, recorder=recorder)
     stranger.start()
+
+    watcher = threading.Thread(target=state_watcher, name="e2e-state-watcher", daemon=True)
+    watcher.start()
 
     def stop_when_done():
         done_event.wait(timeout=240)
@@ -384,10 +760,18 @@ def main() -> int:
         automation = captured.get("automation")
         if automation is not None:
             log("[E2E] the conversation is complete — stopping the bot session")
+            # Last DOM snapshot of the bot's page (captured on its own thread by
+            # _close_camoufox) is what the artifacts will show.
+            try:
+                backend.request_dump(bot_name)
+            except Exception:
+                pass
+            time.sleep(1.5)      # give the page a poll cycle to send it
             try:
                 automation.stop()
             except Exception as error:
                 log(f"[E2E] stop() warning: {error}")
+        stop_all.set()
 
     stopper = threading.Thread(target=stop_when_done, name="e2e-stopper", daemon=True)
     stopper.start()
@@ -398,6 +782,7 @@ def main() -> int:
 
     done_event.wait(timeout=30)
     stranger.join(timeout=30)
+    stop_all.set()
     automation_module.ChitchatAutomation = original_cls   # restore the real class
 
     # -- verdict ---------------------------------------------------------- #
@@ -435,6 +820,33 @@ def main() -> int:
     log(f"  cookies sent by the restored session: {cookies.get('count', 0)} "
         f"({', '.join((cookies.get('names') or [])[:12])})")
     log(f"  chat transcript: {json.dumps(backend.all(), ensure_ascii=False)}")
+
+    results = {
+        "log": str(log.path),
+        "session": usable_account.get("email"),
+        "cookies_sent": cookies.get("count", 0),
+        "messages_in": summary.get("messages_in"),
+        "messages_out": summary.get("messages_out"),
+        "user_replies": stranger.replies,
+    }
+    if not passed:
+        log("")
+        log("[E2E] what to look at / ki check korben:")
+        for line in diagnose(checks, stranger.error):
+            log(f"    {line}")
+
+    artifacts = None
+    if not args.no_artifacts and (args.debug or not passed):
+        try:
+            backend.request_dump("Stranger42")
+            artifacts = recorder.dump(backend=backend, checks=checks,
+                                      reason=stranger.error or summary.get("reason") or "",
+                                      results=results)
+            log(f"[E2E] artifacts: {artifacts}")
+            log(f"[E2E]   read SUMMARY.txt first, then events_*.log / dom_trace.log")
+        except Exception as error:
+            log(f"[E2E] artifact dump failed: {error}")
+
     log(f"[E2E] {'PASS' if passed else 'FAIL'} — full log: {log.path}")
 
     try:

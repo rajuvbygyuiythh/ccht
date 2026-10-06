@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+from datetime import datetime
 from html import escape as html_escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, List, Optional, Tuple
@@ -40,6 +41,13 @@ class ChatBackend:
         self.cookie_seen: Dict[str, Any] = {}
         self._presence: Dict[str, float] = {}
         self._presence_cv = threading.Condition(self._lock)
+        # Debug telemetry: what each page thinks it is showing (the pages push
+        # this themselves, so the harness never has to touch another thread's
+        # Playwright objects).
+        self.states: List[Dict[str, Any]] = []
+        self.dumped_html: Dict[str, Any] = {}
+        self._dump_wanted: Dict[str, int] = {}
+        self.api_trace: List[str] = []
 
     # -- presence ---------------------------------------------------------
     def hello(self, author: str) -> None:
@@ -90,6 +98,40 @@ class ChatBackend:
     def all(self) -> List[Dict[str, Any]]:
         with self._lock:
             return list(self._messages)
+
+    # -- debug telemetry --------------------------------------------------
+    def note_api(self, line: str) -> None:
+        """Keep a bounded trace of the pages' API calls (for debug artifacts)."""
+        with self._lock:
+            self.api_trace.append(f"[{datetime.now().strftime('%H:%M:%S')}] {line}")
+            if len(self.api_trace) > 500:
+                del self.api_trace[:-500]
+
+    def trace_tail(self, count: int = 300) -> List[str]:
+        with self._lock:
+            return list(self.api_trace[-count:])
+
+
+    def note_state(self, where: str, payload: Dict[str, Any]) -> None:
+        entry = {"where": str(where), "ts": time.time(), **(payload or {})}
+        with self._lock:
+            self.states.append(entry)
+
+    def request_dump(self, where: str = "bot") -> None:
+        """Ask the page to send its own HTML on its next poll."""
+        with self._lock:
+            self._dump_wanted[str(where)] = self._dump_wanted.get(str(where), 0) + 1
+
+    def take_dump_request(self, where: str = "bot") -> bool:
+        with self._lock:
+            if self._dump_wanted.get(str(where), 0) > 0:
+                self._dump_wanted[str(where)] -= 1
+                return True
+            return False
+
+    def note_dump(self, where: str, html: str) -> None:
+        with self._lock:
+            self.dumped_html[str(where)] = str(html or "")
 
     # -- evidence ---------------------------------------------------------
     def note_cookies(self, path: str, cookie_header: str) -> None:
@@ -175,8 +217,10 @@ _CHAT_BODY = """
 </div>
 <script>
   window.MOCK_ME = __ME_JSON__;
+  window.MOCK_DEBUG = __DEBUG_JSON__;
   var ME = __ME_JSON__;
   var API = __API_JSON__;
+  var DEBUG = __DEBUG_JSON__;
   var since = 0;
   var rendered = {};
   var box = document.getElementById('messages');
@@ -210,9 +254,45 @@ _CHAT_BODY = """
         if (data.messages && data.messages.length) {
           status.textContent = 'connected as ' + ME + ' · ' + since + ' messages';
         }
+        if (data.dump) { sendDump(); }          // the harness asked for the DOM
       })
       .catch(function () {});
   }
+
+  function stateOf() {
+    var items = Array.from(document.querySelectorAll('main ol li.select-text'));
+    var last = items.length ? items[items.length - 1].innerText : '';
+    var input = document.querySelector('textarea[name="message"]');
+    var connected = document.getElementById('connected-text');
+    return {
+      author: ME,
+      path: location.pathname,
+      bubbles: items.length,
+      last: last.replace(/\s+/g, ' ').trim().slice(0, 120),
+      input: input ? String(input.value || '').slice(0, 80) : null,
+      input_disabled: input ? !!input.disabled : null,
+      connected: connected ? connected.innerText.trim().slice(0, 80) : null,
+      ended: !!window.MOCK_CHAT_ENDED
+    };
+  }
+
+  function sendState() {
+    fetch(API + '/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(stateOf())
+    }).catch(function () {});
+  }
+
+  function sendDump() {
+    fetch(API + '/api/dump', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ author: ME, html: document.documentElement.outerHTML })
+    }).catch(function () {});
+  }
+
+  if (DEBUG) { setInterval(sendState, 2000); sendState(); }
   fetch(API + '/api/hello', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -268,7 +348,8 @@ def page_html(path: str,
               *,
               me: str = "EvaUser",
               api_base: str = "",
-              stranger: str = STRANGER_NAME) -> str:
+              stranger: str = STRANGER_NAME,
+              debug: bool = False) -> str:
     """Return the HTML for one mock page."""
     path = str(path or "/")
     if path.startswith("/chat"):
@@ -281,7 +362,8 @@ def page_html(path: str,
     # The JSON variants are filled first: they carry the name as a *quoted* JS
     # string, so names with dots/spaces ("sadia.6.7") stay valid script.
     html = (html.replace("__ME_JSON__", json.dumps(str(me)))
-                .replace("__API_JSON__", json.dumps(str(api_base or "").rstrip("/"))))
+                .replace("__API_JSON__", json.dumps(str(api_base or "").rstrip("/")))
+                .replace("__DEBUG_JSON__", "true" if debug else "false"))
     return (html.replace("__ME__", html_escape(str(me)))
                 .replace("__STRANGER__", html_escape(str(stranger))))
 
@@ -335,7 +417,8 @@ def make_handler(backend: ChatBackend,
             if path == "/api/messages":
                 since = int((parse_qs(parsed.query).get("since") or ["0"])[0] or 0)
                 messages, next_index = backend.since(since)
-                return self._json({"messages": messages, "next": next_index})
+                return self._json({"messages": messages, "next": next_index,
+                                   "dump": backend.take_dump_request()})
             if path == "/api/all":
                 return self._json({"messages": backend.all()})
             if path in ("/", "/start/new", "/chat", "/chat/"):
@@ -346,7 +429,8 @@ def make_handler(backend: ChatBackend,
 
         def do_POST(self):
             parsed = urlparse(self.path)
-            if parsed.path not in ("/api/send", "/api/hello", "/api/leave"):
+            if parsed.path not in ("/api/send", "/api/hello", "/api/leave",
+                                   "/api/state", "/api/dump"):
                 return self._send(404, b"not found")
             try:
                 length = int(self.headers.get("Content-Length") or 0)
@@ -358,6 +442,12 @@ def make_handler(backend: ChatBackend,
                 return self._json({"ok": True})
             if parsed.path == "/api/leave":
                 backend.leave(payload.get("author"))
+                return self._json({"ok": True})
+            if parsed.path == "/api/state":
+                backend.note_state(payload.get("author") or "?", payload)
+                return self._json({"ok": True})
+            if parsed.path == "/api/dump":
+                backend.note_dump(payload.get("author") or "bot", payload.get("html"))
                 return self._json({"ok": True})
             message = backend.add(payload.get("author"), payload.get("text"))
             return self._json({"ok": True, "message": message})

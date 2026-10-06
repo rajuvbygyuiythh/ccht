@@ -157,11 +157,214 @@ def test_backend():
     check("leaving clears presence", not backend.wait_for_participant("Eva", timeout=0.1))
 
 
+def test_debug_helpers():
+    print("\n[debug helpers]")
+    from tools import e2e_mock_chat as e2e
+
+    state = {"path": "/chat/", "bubbles": 2, "last": "Stranger42 hey",
+             "input": "", "connected": "You are now chatting with Stranger42",
+             "ended": False}
+    line = e2e.format_state("bot", state)
+    check("state line has the useful fields",
+          "bubbles=2" in line and "Stranger42" in line and "ended=False" in line, line)
+    check("empty state does not crash", e2e.format_state("bot", {}) == "bot: <no state>")
+
+    checks = {"browser launched (real Chromium)": True,
+              "the user's message detected": False}
+    hints = e2e.diagnose(checks, "TimeoutError: nope")
+    check("only failed checks get hints", not any("browser launched" in h for h in hints))
+    check("failed check gets a concrete hint",
+          any("the user's message detected" in h for h in hints)
+          and any("chat_reader" in h for h in hints), str(hints))
+    check("the user-side exception is included",
+          any("TimeoutError" in h for h in hints))
+
+
+def test_run_log_never_breaks_the_run():
+    print("\n[log robustness]")
+    from tools import e2e_mock_chat as e2e
+
+    path = Path("/tmp/eva_test_runlog.log")
+    if path.exists():
+        path.unlink()
+    log = e2e.RunLog(path)
+    log("normal line")
+    log.debug("hidden debug line")           # debug off: file only
+    check("debug lines go to the file even when not printed",
+          "hidden debug line" in path.read_text())
+
+    import builtins
+
+    original_print = builtins.print
+
+    def boom(*a, **k):
+        raise BrokenPipeError(32, "Broken pipe")
+
+    builtins.print = boom
+    raised = ""
+    try:
+        log("this must not raise even though stdout is gone")
+    except Exception as error:                     # pragma: no cover
+        raised = repr(error)
+    finally:
+        builtins.print = original_print
+    check("a closed stdout never raises", not raised, raised)
+    check("the logger remembers that stdout is gone", log.stdout_broken is True)
+    check("the line still reached the log file",
+          "stdout is gone" in path.read_text())
+    log.close()
+
+
+def test_debug_artifacts():
+    print("\n[debug artifacts]")
+    from tools import e2e_mock_chat as e2e
+    from tools.mock_chitchat import site
+
+    class FakePage:
+        def __init__(self, html="<html><body>hi</body></html>", fail=False):
+            self._html = html
+            self._fail = fail
+            self.url = "https://app.chitchat.gg/chat/"
+
+        def is_closed(self):
+            return False
+
+        def content(self):
+            if self._fail:
+                raise RuntimeError("page is gone")
+            return self._html
+
+        def screenshot(self, path=None, timeout=None):
+            if self._fail:
+                raise RuntimeError("no screenshot")
+            Path(path).write_bytes(b"PNG")
+
+        def on(self, *_a, **_k):
+            return None
+
+    backend = site.ChatBackend(log=lambda _m: None)
+    backend.add("Stranger42", "hey")
+    backend.note_state("sadia.6.7", {"bubbles": 1, "last": "Stranger42 hey"})
+    backend.note_dump("sadia.6.7", "<html>dumped</html>")
+
+    log = e2e.RunLog(Path("/tmp/eva_test_artifacts.log"), debug=True)
+    recorder = e2e.DebugRecorder(artifacts_dir=Path("/tmp/eva_test_artifacts"), log=log,
+                                 enabled=True)
+    recorder.watch(FakePage(), "bot")
+    result = recorder.capture_page(FakePage(), "bot")
+    check("capture writes the DOM", Path(result["html"]).read_text().startswith("<html>"))
+    check("capture writes a screenshot", Path(result["screenshot"]).is_file())
+    broken = recorder.capture_page(FakePage(fail=True), "bot")
+    check("a dead page is captured as a failure, not an exception",
+          broken["ok"] is False and broken["html"] == "")
+    target = recorder.dump(backend=backend,
+                           checks={"the user's message detected": False,
+                                   "browser launched (real Chromium)": True},
+                           reason="TimeoutError: no reply", results={"log": "x"})
+    names = sorted(p.name for p in target.iterdir())
+    check("summary is written", "SUMMARY.txt" in names, str(names))
+    check("page DOM + screenshot are in the folder",
+          "bot_page.html" in names and "bot_screenshot.png" in names, str(names))
+    check("event log is written", "events_bot.log" in names, str(names))
+    check("mock API trace is written", "mock_api.log" in names, str(names))
+    check("page-pushed DOM is written", "dom_from_page_sadia.6.7.html" in names, str(names))
+    check("chat transcript is written", "transcript.json" in names, str(names))
+    check("cookie evidence is written", "cookies.json" in names, str(names))
+    summary = (target / "SUMMARY.txt").read_text()
+    check("summary lists the failed check + a hint",
+          "✗ the user's message detected" in summary and "chat_reader" in summary)
+    check("summary carries the user-side exception", "TimeoutError: no reply" in summary)
+    log.close()
+
+
+def test_route_layer_api():
+    print("\n[route hook API]")
+    from tools.mock_chitchat import routes, site
+
+    class FakeRequest:
+        def __init__(self, url, method="GET", payload=None):
+            self.url = url
+            self.method = method
+            self._payload = payload
+
+        @property
+        def post_data_json(self):
+            return self._payload
+
+        @property
+        def headers(self):
+            return {"cookie": "token=abc; mock_cc_session=1"}
+
+    class FakeRoute:
+        def __init__(self):
+            self.calls = []
+
+        def fulfill(self, **kwargs):
+            self.calls.append(kwargs)
+            return kwargs
+
+    backend = site.ChatBackend(log=lambda _m: None)
+    traces = []
+    handler = None
+
+    class FakeContext:
+        def route(self, glob, fn):
+            nonlocal handler
+            handler = fn
+
+    routes.install(FakeContext(), backend, me="sadia.6.7", api_base="",
+                   debug=True, log=lambda m: traces.append(m))
+    check("the route hook is installed", callable(handler))
+
+    route = FakeRoute()
+    handler(route, FakeRequest("https://app.chitchat.gg/api/hello", "POST",
+                               {"author": "sadia.6.7"}))
+    check("hello registers presence", backend.wait_for_participant("sadia.6.7", timeout=0.1))
+    check("debug trace logs the API call",
+          any("/api/hello" in t for t in traces), str(traces[-2:]))
+
+    handler(FakeRoute(), FakeRequest("https://app.chitchat.gg/api/send", "POST",
+                                     {"author": "sadia.6.7", "text": "hello there"}))
+    check("send stores the message",
+          [m["text"] for m in backend.all()] == ["hello there"])
+
+    route = FakeRoute()
+    handler(route, FakeRequest("https://app.chitchat.gg/api/messages?since=0"))
+    payload = route.calls[-1]["json"]
+    check("messages are returned to the page",
+          payload["messages"][0]["text"] == "hello there" and payload["next"] == 1)
+
+    handler(FakeRoute(), FakeRequest("https://app.chitchat.gg/api/state", "POST",
+                                     {"author": "sadia.6.7", "bubbles": 1}))
+    check("state telemetry is stored", backend.states[-1]["bubbles"] == 1)
+
+    handler(FakeRoute(), FakeRequest("https://app.chitchat.gg/api/dump", "POST",
+                                     {"author": "sadia.6.7", "html": "<html>page</html>"}))
+    check("page DOM dump is stored",
+          "page" in (backend.dumped_html.get("sadia.6.7") or ""))
+
+    route = FakeRoute()
+    handler(route, FakeRequest("https://app.chitchat.gg/chat/?as=Stranger42"))
+    html = route.calls[-1]["body"]
+    check("a page request renders the stand-in", "You are now chatting with" in html)
+    check("the ?as= identity is honoured", 'window.MOCK_ME = "Stranger42"' in html)
+
+    backend.request_dump("sadia.6.7")
+    route = FakeRoute()
+    handler(route, FakeRequest("https://app.chitchat.gg/api/messages?since=0"))
+    check("a dump request is handed to the page",
+          route.calls[-1]["json"].get("dump") is True)
+
+
 if __name__ == "__main__":
     test_storage_state_import()
     test_one_bad_cookie_does_not_lose_the_rest()
     test_mock_pages()
     test_backend()
+    test_debug_helpers()
+    test_run_log_never_breaks_the_run()
+    test_debug_artifacts()
+    test_route_layer_api()
     print("\n" + "=" * 72)
     print(f"RESULT: {PASSED} passed, {FAILED} failed")
     print("=" * 72)
