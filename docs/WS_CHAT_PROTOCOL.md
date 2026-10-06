@@ -106,9 +106,67 @@ python3 tools/e2e_mock_chat.py --transport ws --bot-page-blind --debug \
   in the log) or if any user text shows up in the bot page's DOM dumps.
 
 A passing run therefore proves: detection came from ``chatMessage`` events, the
-reply went out as a frame, the server echo confirmed it, and the cookies of the
-restored session authenticated the socket (the stand-in identifies the account by
-its cookie jar — exactly how the real endpoint does).
+reply went out **through the site's own send request**, the server echo confirmed
+it, and the cookies of the restored session authenticated both the socket and the
+out-of-band request (the stand-in identifies the account by its cookie jar —
+exactly how the real endpoint does).
+
+The stand-in is **strict**: ``accept_socket_sends=False`` makes it ignore chat
+frames arriving over the socket, the way the capture shows the real endpoint
+behaving.  So a run can only pass by using the real mechanism:
+
+| Log line to look for | What it proves |
+|----------------------|----------------|
+| ``sent chatMessage over the socket — ignored`` | the socket path is blocked, like the real site |
+| ``learned the site's own send request: POST …`` | the page's own write was captured, field names and all |
+| ``http send -> POST http://… status=200`` | the reply was written from the backend |
+| ``sent over HTTP (200)`` + ``delivery confirmed by the server echo (http/200)`` | the server accepted it *and* the echo came back with our nonce |
+
+## Sending a message — the socket does **not** carry it (capture-proven)
+
+This is the correction round 3 is built on.  The full capture lists **every**
+client → server frame:
+
+```
+40{"release":"fe4859ad…"}      <- the socket.io connect
+42["presenceSync"]   x3
+3                    x3        <- engine.io pongs
+```
+
+Nothing else.  Five messages in that capture are *ours* ("hi", "gd", "u", "21",
+"u") — and they appear as **received** ``chatMessage`` frames carrying the
+client's ``nonce`` (``cwTmmxJoKguG3QiZzZgW5``, ``BHX1CEXO7HUSCgOuImWot``, …).  A
+message cannot be sent by a frame that was never sent, so:
+
+> the site writes the message **out of band (HTTP)** and only *listens* on the
+> socket for the echo — an emit on this socket is not how the site sends.
+
+A backend bot therefore has to write the message the same way.  Our bot does:
+
+1. **learn the request** — a sniffer watches the page's own network traffic
+   (``core.chat_ws.SendRequestSniffer``) and stores the very request the app used:
+   method, URL, body, and which body fields hold the text, the nonce and the
+   conversation id (``build_send_template``).  It is persisted to
+   ``data/ws_config.json`` (``http_send``), so later runs start straight from the
+   backend.
+2. **replay it** — ``send_template_request()`` posts the same request from the
+   backend with the account's session cookies, inserting our text, our nonce and
+   the conversation id (``ChatWebSocket._send_via_http``).
+3. **confirm on the socket** — the reply is only reported as delivered when the
+   server's echo of *our* message arrives over the socket (matched by nonce),
+   exactly the way the capture shows it.
+4. if no request has been learned yet, the reply falls back to typing in the page
+   (which is itself what teaches the sniffer the request) — and the socket emit is
+   the last resort, which the real endpoint ignores.
+
+```bash
+python tools/ws_chat.py --show-config          # what is already known
+python tools/ws_chat.py --forget-config        # forget it (learn again fresh)
+python tools/session_chat.py --account EMAIL --transport ws --minutes 30
+```
+
+`--no-http-send` (CLI) ignores the learned request and forces the socket emit,
+for experiments.
 
 ## The one unknown: the *send* event name
 
@@ -172,6 +230,8 @@ Working assumptions the capture *does* prove (all covered by tests):
 | `onlineFriends` answers `presenceSync` | connect handshake |
 | closure: `matchUpdate` + `conversation.closure{closed, closeReason, closedBy}` | ending a chat cleanly |
 | Engine.IO ping `2` every 25 s → answer `3` | the connection stays alive |
+| no client chat frame at all in the capture | replies go out over the site's own HTTP request, the socket only hears the echo |
+| the ping interval (25 s) is longer than a short read timeout | an idle socket must not be torn down (`SocketIOClient` treats silence below `pingInterval + pingTimeout` as normal) |
 
 ## Where the bot uses it
 

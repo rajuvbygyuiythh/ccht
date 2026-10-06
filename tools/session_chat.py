@@ -50,6 +50,7 @@ import json
 import os
 import signal
 import sys
+import queue
 import threading
 import time
 from pathlib import Path
@@ -240,7 +241,8 @@ def _page_username(automation, page, log=print):
 
 
 def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=print,
-                   ws_url=None, send_event="", dom_fallback=True, probe=False):
+                   ws_url=None, send_event="", dom_fallback=True, probe=False,
+                   ws_http_base=""):
     """Restore the session in the browser, then chat over the site's WebSocket.
 
     The browser stays open (and logged in) as the session holder, but the
@@ -249,27 +251,45 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
     socket cannot confirm a delivery, the reply falls back to typing into the
     page (``dom_fallback``), so a chat is never lost.
     """
-    from core.chat_ws import DEFAULT_WS_URL, ChatWebSocket, cookies_header
+    from core.chat_ws import (DEFAULT_WS_URL, ChatWebSocket, SendRequestSniffer,
+                              cookies_header, load_ws_config, save_ws_config)
 
     # Whatever a previous run learned (--probe / --identity) is reused, so the
     # backend can start chatting without any extra flags.
-    learned = {}
-    try:
-        learned = json.loads((ROOT / "data" / "ws_config.json").read_text(encoding="utf-8"))
-    except Exception:
-        learned = {}
+    learned = load_ws_config()
     send_event = send_event or str(learned.get("send_event") or "")
     if send_event:
         log(f"  [WS] send event from data/ws_config.json: {send_event}")
+    def with_base(template):
+        """Apply the harness/proxy base (the stand-in lives on 127.0.0.1)."""
+        if template and ws_http_base:
+            return dict(template, base=ws_http_base)
+        return dict(template or {})
+
+    http_send = with_base(learned.get("http_send"))
+    if http_send:
+        log(f"  [WS] the site's own send request is known: "
+            f"{http_send.get('method')} {http_send.get('url')}"
+            + (f" (routed to {ws_http_base})" if ws_http_base else ""))
 
     started = time.time()
     counts = {"messages_in": 0, "messages_out": 0}
     stop_reason = "finished"
+    chat_conversation_id = ""
     log(f"[Session] running {account.get('email')} over WebSocket (session-only)")
+
+    def remember_http_send(template):
+        """Persist the site's own send request the moment it is seen."""
+        nonlocal http_send
+        http_send = dict(template or {})       # saved as learned (real hostname)
+        save_ws_config(http_send=http_send)
+        log(f"  [WS] saved the site's own send request to data/ws_config.json "
+            f"({template.get('method')} {template.get('url')})")
     automation = build_automation(account, headless=headless, thread_id=thread_id,
                                   log=log)
     chat = None
     page = None
+    sniffer = None
     try:
         automation.is_running = True
         browser = automation._launch_camoufox()
@@ -326,10 +346,23 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
             except Exception as error:
                 log(f"  [WS] probe failed: {error}")
 
+        # The capture shows the site writes messages out of band and only
+        # listens on the socket; this sniffer catches that very request when the
+        # page sends one (the DOM fallback below), so replies can move to the
+        # backend from the next message on.
+        sniffer = SendRequestSniffer(log=log, conversation_id=chat_conversation_id,
+                                     on_template=remember_http_send)
+        sniffer.install(context)
+
         from chat.rule_bot import ChatRuleBot
         bot = ChatRuleBot()
         state = bot.new_conversation()
         log(f"  [ChatRuleBot] active over WS — state keys={len(state)}")
+
+        # Playwright objects belong to the thread that created them, so a DOM
+        # fallback is *queued* here and typed by the session loop below (the
+        # page's owner thread).  The socket callback never touches the page.
+        dom_fallback_queue = queue.Queue()
 
         def answer(text, _raw):
             counts["messages_in"] += 1
@@ -352,28 +385,44 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
                 return
             log(f"  [WS] reply not confirmed over the socket ({how})")
             if dom_fallback and page is not None:
+                dom_fallback_queue.put(reply)
+                log(f"  [WS] queued the DOM fallback for the page's own thread: {reply}")
+
+        def run_dom_fallback(reply):
+            """Typed by the session loop: the page's owner thread only."""
+            try:
+                if not automation.send_chat_message(page, reply, 1):
+                    log(f"  [WS] dom fallback could not type the reply: {reply}")
+                    return
+                counts["messages_out"] += 1
+                # The page writes the message out of band; remember the text so
+                # its echo is not mistaken for a new SMS.
                 try:
-                    if automation.send_chat_message(page, reply, 1):
-                        counts["messages_out"] += 1
-                        # The page's own socket will echo it back — remember the
-                        # text so the echo is not mistaken for a new SMS.
-                        try:
-                            chat.note_sent_text(reply)
-                        except Exception:
-                            pass
-                        log(f"  [REPLY] bot: {reply}   (dom fallback)")
-                except Exception as error:
-                    log(f"  [WS] dom fallback failed: {error}")
+                    chat.note_sent_text(reply)
+                except Exception:
+                    pass
+                log(f"  [REPLY] bot: {reply}   (dom fallback)")
+                # That request is the site's own send path: once seen, the next
+                # reply can be written from the backend without typing anything.
+                if not chat.http_send and sniffer is not None and sniffer.wait(3.0):
+                    chat.set_http_send(with_base(sniffer.template))
+                    log("  [WS] the site's own send request is known — the next reply "
+                        "goes from the backend")
+            except Exception as error:
+                log(f"  [WS] dom fallback failed: {error}")
 
         chat = ChatWebSocket(cookie_header=header, url=ws_url or DEFAULT_WS_URL,
                              my_username=username, send_event=send_event,
                              allow_probe=bool(probe), log=log, on_message=answer)
+        if http_send:
+            chat.set_http_send(http_send)
         chat.start()
         if not chat.wait_connected(30.0):
             log(f"  [WS] socket did not connect: {chat.client.last_error}")
             return {"account": account.get("email"), "ok": False,
                     "reason": f"ws connect failed ({chat.client.last_error})",
                     "seconds": round(time.time() - started, 1), **counts}
+        chat_conversation_id = chat.conversation_id
         log(f"  [WS] live — conversation={chat.conversation_id[:12]} "
             f"participants={chat.stats().get('participants')}")
 
@@ -383,7 +432,12 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
                 stop_reason = f"time limit ({minutes:.0f} min)"
                 log(f"  [Timer] {minutes:.0f} minute limit reached — stopping")
                 break
-            time.sleep(0.5)
+            try:
+                fallback_text = dom_fallback_queue.get(timeout=0.5)
+            except queue.Empty:
+                fallback_text = None
+            if fallback_text is not None:
+                run_dom_fallback(fallback_text)
         if chat is not None and chat.closed_by_peer:
             stop_reason = "the chat was closed by the user"
         stats = chat.stats() if chat is not None else {}
@@ -391,7 +445,8 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
         return {"account": account.get("email"), "ok": True, "reason": stop_reason,
                 "seconds": round(time.time() - started, 1),
                 "ws": {k: stats.get(k) for k in ("conversation", "participants",
-                                                 "confirmed_event", "events")},
+                                                 "confirmed_event", "events",
+                                                 "http_send")},
                 **counts}
     except Exception as error:
         log(f"  [Error] {type(error).__name__}: {error}")
@@ -399,6 +454,10 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
                 "reason": f"error: {type(error).__name__}",
                 "seconds": round(time.time() - started, 1), **counts}
     finally:
+        try:
+            sniffer.stop()
+        except Exception:
+            pass
         try:
             if chat is not None:
                 chat.stop()

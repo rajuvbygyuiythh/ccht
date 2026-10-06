@@ -10,6 +10,7 @@ Run: ``python3 test_ws_transport.py``
 
 import json
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -360,6 +361,249 @@ def test_har_dump_replay():
           and "5 ours" in report, report[-260:])
 
 
+# --------------------------------------------------------------------------- #
+#  the site's own send path (HTTP out of band) — the capture's real mechanism
+# --------------------------------------------------------------------------- #
+
+def _http_recorder(store):
+    """A tiny POST server that records the body it was given."""
+    import json as _json
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(length) or b"{}"
+            try:
+                body = _json.loads(raw)
+            except Exception:
+                body = {"raw": raw.decode("utf-8", "replace")}
+            store.append({"path": self.path, "body": body,
+                          "headers": dict(self.headers)})
+            payload = _json.dumps({"ok": True}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True,
+                     name="http-recorder").start()
+    return server, f"http://127.0.0.1:{server.server_address[1]}"
+
+
+def test_send_template_and_learning():
+    """The learned request must be replayable, and nothing else must look like it."""
+    print("\n[send request template]")
+    import ws_chat
+    from core.chat_ws import (build_send_template, http_send_clues,
+                              look_like_send_request)
+
+    body = {"conversationId": "6ac520e70eaa4314c239e5df", "content": "hi there",
+            "type": "TEXT", "status": "SENT", "token": "abc123",
+            "nonce": "cwTmmxJoKguG3QiZzZgW5"}
+    template = build_send_template("POST", "https://app.chitchat.gg/api/chat/messages",
+                                   body, {"Content-Type": "application/json",
+                                          "Cookie": "token=abc123",
+                                          "Origin": "https://app.chitchat.gg"},
+                                   text="hi there")
+    check("the message text field is detected", template["content_field"] == "content",
+          template["content_field"])
+    check("the nonce field is detected", template["nonce_field"] == "nonce",
+          template["nonce_field"])
+    check("the conversation field is detected",
+          template["conversation_field"] == "conversationId",
+          template["conversation_field"])
+    check("the message text itself is kept", template["body"]["content"] == "hi there")
+    check("per-connection headers are not replayed", "cookie" not in
+          {k.lower() for k in template["headers"]},
+          sorted(template["headers"]))
+
+    empty_id = build_send_template("POST", "https://x/api/chat/messages",
+                                   {"conversationId": "", "content": "hey",
+                                    "nonce": "AAAAAAAAAAAAAAAAAAAAA"},
+                                   {}, text="hey")
+    check("a present-but-empty conversation field is still detected",
+          empty_id["conversation_field"] == "conversationId",
+          empty_id["conversation_field"])
+
+    check("a page bookkeeping POST is not mistaken for a send",
+          not look_like_send_request("POST", "https://x/api/state",
+                                     {"bubbles": 2, "last": "hi"}))
+    check("a real send POST is recognised",
+          look_like_send_request("POST", "https://x/api/chat/messages",
+                                 {"content": "hey"}))
+    check("a GET is never a send",
+          not look_like_send_request("GET", "https://x/api/chat/messages",
+                                     {"content": "hey"}))
+
+    bundle = ('const a=await fetch("/api/chat/messages",{method:"POST"});'
+              ' axios.post("/api/conversations/7f/messages",body);'
+              ' socket.emit("presenceSync");')
+    clues = http_send_clues(bundle)
+    check("the bundle scan finds the send endpoint",
+          "/api/chat/messages" in clues and any("conversations" in c for c in clues),
+          clues)
+    check("the bundle scan ignores the socket events", all("presenceSync" not in c
+                                                           for c in clues))
+
+
+def test_http_send_request():
+    """``send_template_request`` posts our text/nonce, and honours the base hook."""
+    print("\n[http send request]")
+    from core.chat_ws import send_template_request
+
+    store = []
+    server, base = _http_recorder(store)
+    try:
+        template = {"method": "POST", "url": "https://app.chitchat.gg/api/chat/messages",
+                    "body": {"conversationId": "", "content": "", "type": "TEXT",
+                             "nonce": ""},
+                    "headers": {"content-type": "application/json"},
+                    "content_field": "content", "nonce_field": "nonce",
+                    "conversation_field": "conversationId",
+                    "base": base}
+        ok, detail, status = send_template_request(
+            template, cookie_header="token=abc123", text="hello there",
+            nonce="NONCE0000000000000001", conversation_id="6ac520e70eaa4314c239e5df",
+            log=lambda m: None)
+        check("the request was accepted", ok and status == 200, f"{ok} {status} {detail}")
+        check("exactly one request was recorded", len(store) == 1, len(store))
+        sent = store[0]["body"]
+        check("the text went out", sent.get("content") == "hello there", sent)
+        check("the nonce went out", sent.get("nonce") == "NONCE0000000000000001", sent)
+        check("the conversation went out",
+              sent.get("conversationId") == "6ac520e70eaa4314c239e5df", sent)
+        check("the session cookie authenticated the request",
+              "token=abc123" in str(store[0]["headers"].get("Cookie") or ""),
+              store[0]["headers"].get("Cookie"))
+        check("the base hook redirected the request to the local server",
+              store[0]["path"] == "/api/chat/messages", store[0]["path"])
+    finally:
+        server.shutdown()
+
+    # a wrong URL must fail honestly (no exception, no fake success)
+    ok, detail, status = send_template_request(
+        {"method": "POST", "url": "http://127.0.0.1:1/nope", "body": {"content": ""},
+         "content_field": "content"}, text="x", log=lambda m: None)
+    check("a failing request is reported honestly", not ok, detail)
+
+
+def test_http_send_over_http_with_echo():
+    """The captured mechanism: socket ignores the send, HTTP writes it, echo confirms."""
+    print("\n[out-of-band send + socket echo]")
+    import json as _json
+    import urllib.request
+    from core.chat_ws import ChatWebSocket
+    from tools.mock_chitchat.ws_server import ChitchatSocketServer
+
+    server = ChitchatSocketServer(log=lambda m: None, ping_interval=30.0,
+                                  accept_socket_sends=False)
+    url = server.start()
+    try:
+        chat = ChatWebSocket(url=url, cookie_header="token=STUB", log=lambda m: None,
+                             echo_timeout=3.0)
+        chat.start()
+        check("the socket connects", chat.wait_connected(5.0))
+
+        # the message log is fed by the out-of-band request, like the real server
+        def _out_of_band(text, nonce):
+            server.publish({"author": "me", "id": _nanoid_len(text + nonce),
+                            "text": text, "nonce": nonce})
+
+        store = []
+
+        def handler_for(store):
+            return store
+
+        # a one-shot HTTP endpoint that pushes into the socket stand-in
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        class Send(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_POST(self):
+                length = int(self.headers.get("Content-Length") or 0)
+                body = _json.loads(self.rfile.read(length) or b"{}")
+                store.append(body)
+                _out_of_band(str(body.get("content") or ""),
+                             str(body.get("nonce") or ""))
+                self.send_response(200)
+                self.send_header("Content-Length", "2")
+                self.end_headers()
+                self.wfile.write(b"{}")
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), Send)
+        threading.Thread(target=httpd.serve_forever, daemon=True, name="oob").start()
+        try:
+            chat.set_http_send({"method": "POST",
+                                "url": f"http://127.0.0.1:{httpd.server_address[1]}/send",
+                                "body": {"content": "", "nonce": ""},
+                                "content_field": "content", "nonce_field": "nonce"})
+            # a socket emit must NOT work in this mode (the real site ignores it)
+            ok, how = chat.send_message("over http", timeout=1.0)
+            check("the reply is sent out of band and confirmed by the echo",
+                  ok and "http" in how, how)
+            check("the request carried our nonce and text",
+                  store and store[0].get("content") == "over http"
+                  and len(str(store[0].get("nonce"))) == 21, store[:1])
+            check("our own echo is not counted as an incoming SMS",
+                  chat.messages_in == 0 and chat.messages_out == 1,
+                  f"in={chat.messages_in} out={chat.messages_out}")
+        finally:
+            httpd.shutdown()
+
+        # and the socket itself is strict: an emit is ignored by the stand-in
+        chat.set_http_send({})
+        before = len(server.messages)
+        chat.send_message("straight over the socket", timeout=1.0)
+        check("the strict socket ignores a chat frame (as the site does)",
+              len(server.messages) == before, len(server.messages))
+        chat.stop()
+        time.sleep(0.3)
+    finally:
+        server.stop()
+
+
+def _nanoid_len(seed: str) -> int:
+    return 12 + (len(seed) % 8)
+
+
+def test_quiet_socket_stays_connected():
+    """A quiet chat must not tear the socket down (the site pings every 25 s)."""
+    print("\n[idle socket]")
+    from core.chat_ws import ChatWebSocket
+    from tools.mock_chitchat.ws_server import ChitchatSocketServer
+
+    server = ChitchatSocketServer(log=lambda m: None, ping_interval=2.0,
+                                  ping_timeout=2.0, accept_socket_sends=False)
+    url = server.start()
+    try:
+        chat = ChatWebSocket(
+            url=url, cookie_header="token=STUB", log=lambda m: None,
+            client_factory=lambda *a, **kw: SocketIOClient(*a, timeout=1.0, **kw))
+        chat.start()
+        check("it connects", chat.wait_connected(5.0))
+        deadline = time.time() + 7.0
+        while time.time() < deadline:
+            time.sleep(0.25)
+            if not chat.client.connected:
+                break
+        check("it is still connected after several quiet seconds",
+              chat.client.connected,
+              f"detected as lost: {chat.client.last_error}")
+        check("idle time is tracked", chat.client.idle_seconds() >= 0.0)
+        chat.stop()
+    finally:
+        server.stop()
+
+
+
 def test_har_replay():
     print("\n[har replay — the real capture shape]")
     sys.path.insert(0, str(REPO / "tools"))
@@ -495,6 +739,10 @@ if __name__ == "__main__":
     test_dom_fallback_echo_is_not_incoming()
     test_har_replay()
     test_har_dump_replay()
+    test_send_template_and_learning()
+    test_http_send_request()
+    test_http_send_over_http_with_echo()
+    test_quiet_socket_stays_connected()
     test_probe_finds_the_event()
     test_har_report()
     print("\n" + "=" * 72)

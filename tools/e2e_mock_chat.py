@@ -629,6 +629,10 @@ def main() -> int:
                 "/tmp/chromium-libs/lib:" + os.environ.get("LD_LIBRARY_PATH", ""))
         print("[E2E] using the out-of-band Chromium at /tmp/chromium")
 
+    # The learned settings (send event / send request) are written by the bot at
+    # runtime; a test run keeps them in /tmp so the repository file stays clean.
+    os.environ.setdefault("EVA_WS_CONFIG", "/tmp/eva_ws_config.json")
+
     work_dir = Path("/tmp/eva_e2e_sessions")
     work_dir.mkdir(parents=True, exist_ok=True)
     os.environ["EVA_SESSIONS_DIR"] = str(work_dir)
@@ -686,9 +690,33 @@ def main() -> int:
                     session_token = str(cookie["value"])
         except Exception as error:
             log(f"[MockWS] could not read the session cookies: {error}")
+        # The pages and the backend identify themselves by the session token,
+        # exactly like the real site reads the account from its cookie jar.
+        try:
+            backend.register_tokens(token_map)
+            log(f"[MockSite] {len(token_map)} session token(s) map to an account "
+                f"on the stand-in")
+        except Exception as error:
+            log(f"[MockSite] could not register the session tokens: {error}")
         ws_server = ChitchatSocketServer(log=log, ping_interval=25.0,
-                                         token_map=token_map)
+                                         token_map=token_map,
+                                         accept_socket_sends=False)
+        # The real server hears a message the moment it is written *out of band*
+        # and broadcasts it to the sockets — the capture shows exactly that (the
+        # sender's own text comes back as a chatMessage with its nonce).  The
+        # mock backend therefore feeds the socket stand-in.
+        def _bridge(message):
+            try:
+                ws_server.publish(dict(message))
+            except Exception as error:
+                log(f"[MockWS] bridge failed: {error}")
+
+        backend.on_message_added(_bridge)
+        log("[MockWS] the mock backend now feeds the socket stand-in "
+            "(out-of-band HTTP messages reach the sockets)")
         ws_backend_url = ws_server.start()
+        ws_server.conversation_id = backend.conversation()
+        log(f"[MockWS] conversation id shared with the pages: {ws_server.conversation_id}")
         ws_page_url = ws_backend_url
         log("[MockWS] the chat socket stand-in is listening at "
             f"{ws_backend_url} (Engine.IO v4 + Socket.IO, the frames captured "
@@ -703,6 +731,10 @@ def main() -> int:
         os.environ["EVA_CHROMIUM_EXTRA_ARGS"] = (
             (os.environ.get("EVA_CHROMIUM_EXTRA_ARGS", "") + " " + ws_extra).strip())
         ws_page_url = ws_backend_url
+        log("[MockWS] STRICT mode: chat frames sent over the socket are ignored "
+            "(the capture shows the site writes messages out of band and only "
+            "listens on the socket) — a reply can only arrive through the site's "
+            "own HTTP send request + the broadcast back over the socket")
         log(f"[MockWS] the mock pages dial the stand-in directly "
             f"({ws_page_url}) so both browsers use a real socket; the browser is "
             f"started with {ws_extra}")
@@ -774,14 +806,14 @@ def main() -> int:
                 routes.install(
                     context, backend, me=bot_name, api_base="", log=log,
                     debug=args.debug, ws_url=ws_page_url,
-                    transport=("dom" if (args.bot_page_blind and ws_mode)
-                               else args.transport), on_page=bot_page_loaded,
+                    transport=args.transport, on_page=bot_page_loaded,
+                    connect_socket=not (args.bot_page_blind and ws_mode),
                     blind_others=bool(args.bot_page_blind and ws_mode))
                 if args.bot_page_blind and ws_mode:
-                    log("[MockSite] BLIND bot page: no page-side socket and the "
-                        "user's messages are never served to this context — the "
-                        "account's only socket is the backend client, and only "
-                        "the socket can report the user's words")
+                    log("[MockSite] BLIND bot page: the user's messages are never "
+                        "served to this context and the page opens no socket (it "
+                        "still writes through the site's own HTTP request) — the "
+                        "account's only socket is the backend client")
                 log("[MockSite] ✓ route hook installed on the account's browser context")
                 # Watch every page this account opens (console/errors/network).
                 # Listeners fire on the automation's own thread, so this is safe.
@@ -969,7 +1001,7 @@ def main() -> int:
         summary = session_chat.run_account_ws(
             usable_account, headless=not args.visible, minutes=args.minutes,
             thread_id=1, log=log, ws_url=ws_backend_url or None,
-            send_event=args.ws_send_event)
+            send_event=args.ws_send_event, ws_http_base=api_base)
     else:
         log("[E2E] starting the real session runner (tools/session_chat.run_account)")
         summary = session_chat.run_account(usable_account, headless=not args.visible,
@@ -1046,8 +1078,11 @@ def main() -> int:
             "incoming SMS was read from chatMessage events":
                 ws_events.get("chatMessage", 0) >= 2 and has("[WS] incoming SMS from"),
             "the reply was confirmed by the server echo":
-                has("[WS] ✓ delivery confirmed"),
-            "no DOM fallback was needed": not has("(dom fallback)"),
+                has("delivery confirmed"),
+            "the site's own send request was learned from the page":
+                has("learned the site's own send request"),
+            "a reply left the backend through the site's own HTTP request":
+                has("[WS] sent over HTTP"),
             "the chat closure travelled over the socket":
                 has("[WS] the chat was closed") or has("[WS] matchUpdate"),
         })

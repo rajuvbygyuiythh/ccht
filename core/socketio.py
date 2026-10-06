@@ -81,6 +81,12 @@ class SocketIOClient:
         self.auto_reconnect = bool(auto_reconnect)
         self.reconnect_max = float(reconnect_max)
         self.connect_timeout = float(connect_timeout)
+        # Health of a *quiet* connection: a read timeout only wakes the loop, the
+        # socket is dead when nothing at all arrived for pingInterval+pingTimeout
+        # (the site pings every 25 s, our read timeout is shorter than that).
+        self.last_rx = time.time()
+        self.ping_interval = 25.0
+        self.ping_timeout = 20.0
         self.socket_factory = socket_factory or socket.create_connection
 
         self.sock: Optional[socket.socket] = None
@@ -198,6 +204,7 @@ class SocketIOClient:
             chunk = self.sock.recv(65536)
             if not chunk:
                 raise ConnectionError("socket closed")
+            self.last_rx = time.time()
             self._buffer += chunk
         out, self._buffer = self._buffer[:count], self._buffer[count:]
         return out
@@ -292,6 +299,8 @@ class SocketIOClient:
                 handshake = {}
             self.sid = str(handshake.get("sid") or "")
             ping_ms = int(handshake.get("pingInterval") or 25000)
+            self.ping_interval = max(1.0, ping_ms / 1000.0)
+            self.ping_timeout = max(1.0, int(handshake.get("pingTimeout") or 20000) / 1000.0)
             self.log(f"[WS] engine.io open: sid={self.sid} ping={ping_ms}ms "
                      f"upgrades={handshake.get('upgrades')}")
             payload = json.dumps(self.namespace_payload, separators=(",", ":"))
@@ -343,6 +352,14 @@ class SocketIOClient:
     # ------------------------------------------------------------------ #
     #  run loop
     # ------------------------------------------------------------------ #
+    def idle_seconds(self) -> float:
+        """How long the socket has been silent (no frame at all)."""
+        return max(0.0, time.time() - self.last_rx)
+
+    def idle_limit(self) -> float:
+        """Silence that means the peer is gone (engine.io ping + grace)."""
+        return max(30.0, self.ping_interval + self.ping_timeout)
+
     def _run(self) -> None:
         backoff = 1.0
         while not self._stop.is_set():
@@ -352,7 +369,17 @@ class SocketIOClient:
                 self._connect()
                 backoff = 1.0
                 while not self._stop.is_set():
-                    opcode, payload = self._recv_message()
+                    try:
+                        opcode, payload = self._recv_message()
+                    except (socket.timeout, TimeoutError):
+                        # Quiet chat is normal: the server pings every 25 s.  Only
+                        # silence beyond the ping window means the peer is gone.
+                        if self.idle_seconds() > self.idle_limit():
+                            raise ConnectionError(
+                                f"no traffic for {self.idle_seconds():.0f}s "
+                                f"(ping interval {self.ping_interval:.0f}s + "
+                                f"timeout {self.ping_timeout:.0f}s)")
+                        continue
                     if opcode == 0x8:
                         raise ConnectionError("server closed the websocket")
                     if opcode in (0x1, 0x2):

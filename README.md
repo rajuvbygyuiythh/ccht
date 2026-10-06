@@ -340,7 +340,8 @@ wss://api.chitchat.gg/socket.io/?EIO=4&transport=websocket
   → 42["presenceSync"]
   ← 42["matchUpdate", {match:{conversation:{…}}}]     the chat to talk in
   ← 42["chatMessage", {message:{author, content}}]    incoming SMS
-  → 42["<send event>", {conversationId, content}]     our reply
+  → (no chat frame: the site writes the message out of band over HTTP,
+     the socket only carries the echo back — capture-proven, see below)
   ← 42["chatMessage", …]                              the server echo = delivered
 ```
 
@@ -377,14 +378,30 @@ python tools/ws_chat.py --replay ws.txt
 python tools/ws_chat.py --identity --account EMAIL
 ```
 
-**The send event name.** The capture does not contain the client frame that sends
-a message (the message was typed before the capture started), so the bot resolves
-it in this order: `--ws-send-event` / `data/ws_config.json` → `--probe` (reads
-the event names out of the site's own chat bundle) → the default candidate list →
-and in every case **delivery is only accepted when the server echoes the message
-back** (`[WS] ✓ delivery confirmed by the server echo`). If nothing is confirmed,
-`run_account_ws` falls back to typing in the page (`--no-dom-fallback` disables
-that), so a chat is never lost.
+**How a reply is sent (the capture's real mechanism).** The full capture contains
+*no* client chat frame at all — only the socket.io connect, `presenceSync` and
+pongs — while every message the account sent came back as a **received**
+`chatMessage` carrying the client's `nonce`.  The site therefore writes the
+message **out of band (HTTP)** and only listens on the socket.  The bot does the
+same and learns the request automatically:
+
+1. the first reply (or any reply typed into the page) is watched by
+   `core.chat_ws.SendRequestSniffer`, which records the app's own request —
+   method, URL, body, and which fields carry the text / nonce / conversation id;
+2. the request, its field names and the session cookies are persisted in
+   `data/ws_config.json`, and every later reply is written **from the backend**
+   with `send_template_request()`;
+3. delivery is only accepted when the server's echo of our message arrives over
+   the socket (`[WS] ✓ delivery confirmed by the server echo (http/200)`).
+
+```bash
+python tools/ws_chat.py --show-config       # what has been learned
+python tools/ws_chat.py --forget-config     # forget it and learn again
+```
+
+A socket emit is still available as a last resort (`--no-http-send` forces it),
+and `--probe` / `--ws-send-event` keep working for a site that also accepts one
+— but on the captured build the HTTP path is the real one.
 
 `--transport dom` (the default) is unchanged: the DOM flow from v2.2–v2.7 still
 runs exactly as before.
@@ -406,9 +423,14 @@ v4 + Socket.IO to it.  The added checks:
 | the restored session cookies went out on the socket handshake | the socket is authenticated by `storage_state.json` (cookie/token only) |
 | the account identity came from its own session | the saved cookies + the account's own echo (the socket `pid` is only a session id) |
 | incoming SMS was read from `chatMessage` events | detection is socket-side, not DOM |
-| the reply was confirmed by the server echo | the reply really left the bot over the socket |
-| no DOM fallback was needed | the reply was not typed into the page |
+| the reply was confirmed by the server echo | the reply really reached the server (echo matched by nonce) |
+| the site's own send request was learned from the page | the request the app uses is captured, field names and all |
+| a reply left the backend through the site's own HTTP request | the reply was written by the backend, not typed |
 | the chat closure travelled over the socket | `closure{closed:true}` handling |
+
+The socket stand-in is **strict** in this mode (`accept_socket_sends=False`): a
+chat frame sent over the socket is ignored, exactly as the capture shows the real
+endpoint doing — so the run can only pass through the out-of-band request.
 
 With `--bot-page-blind` the same run becomes the strict **WS-only proof**: the
 bot's own page is served a *blind* DOM (the user's messages are never handed to

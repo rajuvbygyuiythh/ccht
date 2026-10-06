@@ -25,6 +25,7 @@ only shows received ``chatMessage`` frames).  This module therefore:
 from __future__ import annotations
 
 import json
+import os
 import queue
 import random
 import re
@@ -133,6 +134,8 @@ class ChatWebSocket:
         self.my_id = str(my_id or "")
         self.send_event = str(send_event or "")
         self.sent_event: str = ""          # the one that actually worked
+        # The site's own HTTP send request, once learned (see build_send_template).
+        self.http_send: Dict[str, Any] = {}
         self.log = log
         self.on_message = on_message
         self.on_match = on_match
@@ -439,6 +442,8 @@ class ChatWebSocket:
         if not self.client.connected:
             return False, "not connected"
         timeout = float(timeout if timeout is not None else self.echo_timeout)
+        if self.http_send:
+            return self._send_via_http(text, timeout=timeout, wait_for_echo=wait_for_echo)
 
         configured = bool(self.sent_event or self.send_event)
         events = [self.sent_event or self.send_event] if configured else []
@@ -478,6 +483,41 @@ class ChatWebSocket:
                 break
         return False, "no echo for any candidate event"
 
+    def set_http_send(self, template: Optional[Dict[str, Any]]) -> None:
+        """Use (or forget) the site's own HTTP send request for replies."""
+        self.http_send = dict(template or {})
+        if self.http_send:
+            self.log(f"[WS] replies will use the site's own send request: "
+                     f"{self.http_send.get('method')} {self.http_send.get('url')}")
+
+    def _send_via_http(self, text: str, *, timeout: float,
+                       wait_for_echo: bool = True) -> Tuple[bool, str]:
+        """Send through the learned request and confirm it on the socket echo."""
+        nonce = self._new_nonce()
+        with self._lock:
+            self.nonces.append(nonce)
+            del self.nonces[:-200]
+        self._echo_event.clear()
+        self._echo_text = text
+        self._echo_nonce = nonce
+        with self._lock:
+            self.echoes.append(text)
+        ok, detail, status = send_template_request(
+            self.http_send, cookie_header=self.cookie_header, text=text, nonce=nonce,
+            conversation_id=self.conversation_id, log=self.log)
+        if not ok:
+            return False, f"http failed ({detail})"
+        self.log(f"[WS] sent over HTTP ({status}) → {text[:60]}")
+        if not wait_for_echo:
+            return True, f"http/{status} (unconfirmed)"
+        if self._echo_event.wait(timeout):
+            self.log(f"[WS] ✓ delivery confirmed by the server echo (http/{status})")
+            return True, f"http/{status}"
+        # The site's own endpoint took it; the echo may simply have been missed.
+        self.log(f"[WS] the site accepted the message (HTTP {status}) but no socket "
+                 f"echo was seen within {timeout:.1f}s")
+        return True, f"http/{status} (echo not seen)"
+
     # ------------------------------------------------------------------ #
     #  reporting
     # ------------------------------------------------------------------ #
@@ -492,9 +532,326 @@ class ChatWebSocket:
             "messages_in": self.messages_in,
             "messages_out": self.messages_out,
             "confirmed_event": self.sent_event,
+            "http_send": (f"{self.http_send.get('method')} {self.http_send.get('url')}"
+                          if self.http_send else ""),
             "closed_by_peer": self.closed_by_peer,
         })
         return base
+
+
+# --------------------------------------------------------------------------- #
+#  the site's own send path (HTTP) — see the note in the module docstring
+# --------------------------------------------------------------------------- #
+
+#: Body keys that carry the message text, most likely first.
+CONTENT_FIELDS: Tuple[str, ...] = ("content", "text", "message", "body", "msg")
+
+#: Body keys that carry the client-generated nonce.
+NONCE_FIELDS: Tuple[str, ...] = ("nonce", "clientMessageId", "clientId", "tempId",
+                                 "idempotencyKey")
+
+#: Body keys that carry the conversation id.
+CONVERSATION_FIELDS: Tuple[str, ...] = ("conversationId", "conversation", "chatId",
+                                        "roomId", "matchId")
+
+#: Request headers worth replaying (everything else is per-connection).
+REPLAY_HEADERS: Tuple[str, ...] = ("content-type", "accept", "authorization",
+                                   "x-csrf-token", "x-xsrf-token", "x-requested-with",
+                                   "referer", "origin", "user-agent",
+                                   "accept-language")
+
+#: Paths that are page bookkeeping, never a message send.
+_NOT_SEND_PATHS = ("/state", "/dump", "/hello", "/leave", "/presence", "/typing")
+
+_WS_CONFIG_ENV = "EVA_WS_CONFIG"
+
+
+def ws_config_path() -> Path:
+    """Where the learned socket/HTTP settings live (tests override the env)."""
+    override = os.environ.get(_WS_CONFIG_ENV) or ""
+    if override:
+        return Path(override)
+    return Path(__file__).resolve().parents[1] / "data" / "ws_config.json"
+
+
+def load_ws_config() -> Dict[str, Any]:
+    try:
+        data = json.loads(ws_config_path().read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_ws_config(**updates: Any) -> Dict[str, Any]:
+    data = load_ws_config()
+    data.update({k: v for k, v in updates.items() if v is not None})
+    try:
+        path = ws_config_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    return data
+
+
+def build_send_template(method: str, url: str, body: Dict[str, Any],
+                        headers: Optional[Dict[str, str]] = None,
+                        text: str = "") -> Dict[str, Any]:
+    """Normalise one real send request into a replayable template.
+
+    The field names are detected from the body itself (the value that is the
+    message text, an id-looking value, a nonce-looking value), so the bot never
+    has to guess the site's schema.
+    """
+    body = dict(body or {})
+    content_field = ""
+    for key in CONTENT_FIELDS:
+        if isinstance(body.get(key), str) and body[key] == text and text:
+            content_field = key
+            break
+    if not content_field:
+        for key in CONTENT_FIELDS:
+            if isinstance(body.get(key), str) and body[key]:
+                content_field = key
+                break
+    if not content_field:
+        for key, value in body.items():
+            if isinstance(value, str) and value == text and text:
+                content_field = key
+                break
+    nonce_field = ""
+    for key in NONCE_FIELDS:
+        if isinstance(body.get(key), str) and body[key]:
+            nonce_field = key
+            break
+    if not nonce_field:
+        for key, value in body.items():
+            if (isinstance(value, str) and 12 <= len(value) <= 40
+                    and re.fullmatch(r"[A-Za-z0-9_-]+", value)
+                    and value not in (body.get(content_field),)):
+                if not re.fullmatch(r"[0-9a-f]{24}", value):
+                    nonce_field = key
+                    break
+    conversation_field = ""
+    for key in CONVERSATION_FIELDS:
+        # Present-but-empty still counts: the request *shape* is what matters
+        # (the page may not have learned the id yet).
+        if key in body and isinstance(body.get(key), str):
+            conversation_field = key
+            break
+    if not conversation_field:
+        for key, value in body.items():
+            if isinstance(value, str) and re.fullmatch(r"[0-9a-f]{24}", value):
+                conversation_field = key
+                break
+    keep_headers = {}
+    for key, value in (headers or {}).items():
+        low = str(key).lower()
+        if low in REPLAY_HEADERS and str(value).strip():
+            keep_headers[str(key)] = str(value)
+        if low.startswith("x-") and low not in ("x-requested-with",) and str(value).strip():
+            keep_headers[str(key)] = str(value)
+    return {
+        "method": str(method or "POST").upper(),
+        "url": str(url),
+        "body": body,
+        "headers": keep_headers,
+        "content_field": content_field or "content",
+        "nonce_field": nonce_field,
+        "conversation_field": conversation_field,
+        "learned_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+
+
+def look_like_send_request(method: str, url: str, body: Any) -> bool:
+    """Is this request the app sending a chat message?"""
+    if str(method or "").upper() not in ("POST", "PUT", "PATCH"):
+        return False
+    lowered = str(url or "").lower()
+    if any(bit in lowered for bit in _NOT_SEND_PATHS):
+        return False
+    if not isinstance(body, dict) or not body:
+        return False
+    if not any(isinstance(body.get(k), str) and body.get(k) for k in CONTENT_FIELDS):
+        return False
+    return True
+
+
+def send_template_request(template: Dict[str, Any], *, cookie_header: str = "",
+                          text: str = "", nonce: str = "", conversation_id: str = "",
+                          timeout: float = 10.0,
+                          log: Callable[[str], None] = print) -> Tuple[bool, str, int]:
+    """Replay a learned send request from the backend. ``(ok, detail, status)``."""
+    import urllib.error
+    import urllib.request
+
+    if not isinstance(template, dict) or not template.get("url"):
+        return False, "no template", 0
+    body = dict(template.get("body") or {})
+    content_field = str(template.get("content_field") or "content")
+    if content_field not in body:
+        for key in CONTENT_FIELDS:
+            if key in body:
+                content_field = key
+                break
+    url = str(template["url"])
+    base = str(template.get("base") or "").strip()          # harness/proxy hook
+    if base:
+        from urllib.parse import urlsplit, urlunsplit
+        parts = urlsplit(url)
+        base_parts = urlsplit(base if "://" in base else f"http://{base}")
+        url = urlunsplit((base_parts.scheme or parts.scheme,
+                          base_parts.netloc or parts.netloc,
+                          parts.path, parts.query, parts.fragment))
+    body[content_field] = str(text)
+    nonce_field = str(template.get("nonce_field") or "")
+    if nonce_field:
+        body[nonce_field] = str(nonce)
+    conversation_field = str(template.get("conversation_field") or "")
+    if conversation_field and conversation_id:
+        body[conversation_field] = str(conversation_id)
+    elif conversation_id:
+        for key in CONVERSATION_FIELDS:
+            if key in body:
+                body[key] = str(conversation_id)
+                break
+    payload = json.dumps(body).encode("utf-8")
+    request = urllib.request.Request(url, data=payload,
+                                     method=str(template.get("method") or "POST"))
+    headers = dict(template.get("headers") or {})
+    headers.setdefault("Content-Type", "application/json")
+    if cookie_header:
+        headers["Cookie"] = cookie_header
+    for key, value in headers.items():
+        try:
+            request.add_header(str(key), str(value))
+        except Exception:
+            continue
+    try:
+        with urllib.request.urlopen(request, timeout=float(timeout)) as response:
+            status = int(getattr(response, "status", 200) or 200)
+            snippet = ""
+            try:
+                snippet = response.read(400).decode("utf-8", "replace")
+            except Exception:
+                snippet = ""
+        log(f"[WS] http send → {template.get('method')} {url} status={status}")
+        return 200 <= status < 300, snippet[:200], status
+    except urllib.error.HTTPError as error:
+        detail = ""
+        try:
+            detail = error.read(300).decode("utf-8", "replace")
+        except Exception:
+            detail = str(error)
+        log(f"[WS] http send failed: {error.code} {detail[:160]}")
+        return False, f"HTTP {error.code} {detail[:160]}", int(error.code or 0)
+    except Exception as error:
+        log(f"[WS] http send error: {type(error).__name__}: {error}")
+        return False, f"{type(error).__name__}: {error}", 0
+
+
+class SendRequestSniffer:
+    """Watch a browser context for the app's *own* message-send request.
+
+    Nothing is ever typed by the sniffer itself: it just listens.  When the bot's
+    page sends a message (the DOM fallback does exactly that), the request goes
+    through here and is turned into a :func:`build_send_template` template, so
+    the next reply can be sent from the backend — the same way the site does it.
+    """
+
+    def __init__(self, log: Callable[[str], None] = print, conversation_id: str = "",
+                 on_template: Optional[Callable[[Dict[str, Any]], None]] = None):
+        self.log = log
+        self.conversation_id = str(conversation_id or "")
+        self.on_template = on_template
+        self.template: Dict[str, Any] = {}
+        self.requests_seen = 0
+        self._context = None
+        self._event = threading.Event()
+
+    # -- Playwright hook (runs on the browser's own thread) ----------------
+    def on_request(self, request: Any) -> None:
+        try:
+            method = str(getattr(request, "method", "") or "")
+            if method.upper() not in ("POST", "PUT", "PATCH"):
+                return
+            url = str(getattr(request, "url", "") or "")
+            if "chitchat" not in url and "127.0.0.1" not in url and "localhost" not in url:
+                return
+            data = None
+            try:
+                data = request.post_data
+            except Exception:
+                data = None
+            if not data:
+                return
+            try:
+                body = json.loads(data)
+            except Exception:
+                return
+            if not look_like_send_request(method, url, body):
+                return
+            self.requests_seen += 1
+            text = ""
+            for key in CONTENT_FIELDS:
+                if isinstance(body.get(key), str):
+                    text = body[key]
+                    break
+            headers = {}
+            try:
+                headers = dict(request.headers or {})
+            except Exception:
+                headers = {}
+            template = build_send_template(method, url, body, headers, text=text)
+            self.template = template
+            nonce_field = template["nonce_field"] or "-"
+            conversation_field = template["conversation_field"] or "-"
+            self.log(f"[WS] learned the site's own send request: {template['method']} "
+                     f"{template['url']} (content={template['content_field']!r}, "
+                     f"nonce={nonce_field!r}, conversation={conversation_field!r})")
+            if self.on_template is not None:
+                try:
+                    self.on_template(template)
+                except Exception as error:
+                    self.log(f"[WS] send-template callback failed: {error}")
+            self._event.set()
+        except Exception as error:
+            self.log(f"[WS] request sniffer: {type(error).__name__}: {error}")
+
+    # -- ownership ---------------------------------------------------------
+    def install(self, context: Any) -> None:
+        try:
+            context.on("request", self.on_request)
+            self._context = context
+            self.log("[WS] watching the page for the site's own message-send request")
+        except Exception as error:
+            self.log(f"[WS] could not watch the page requests: {error}")
+
+    def stop(self) -> None:
+        if self._context is None:
+            return
+        try:
+            self._context.remove_listener("request", self.on_request)
+        except Exception:
+            pass
+        self._context = None
+
+    def wait(self, timeout: float = 2.0) -> Dict[str, Any]:
+        self._event.wait(max(0.1, float(timeout)))
+        return self.template
+
+
+def http_send_clues(script_text: str) -> List[str]:
+    """Candidate send endpoints inside a saved JS bundle (offline discovery)."""
+    clues: List[str] = []
+    for match in re.finditer(r"""(?P<quote>["'`])(?P<path>/[A-Za-z0-9_./{}$:\-]{3,120})(?P=quote)""",
+                             str(script_text or "")):
+        path = match.group("path")
+        if not re.search(r"(message|chat|conversation)", path, re.I):
+            continue
+        if path not in clues:
+            clues.append(path)
+    return clues[:20]
 
 
 # --------------------------------------------------------------------------- #

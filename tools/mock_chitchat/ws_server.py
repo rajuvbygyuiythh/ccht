@@ -227,12 +227,17 @@ class ChitchatSocketServer:
                  ping_interval: float = 25.0, ping_timeout: float = 20.0,
                  token_map: Optional[Dict[str, str]] = None,
                  default_stranger: str = "Stranger42",
+                 accept_socket_sends: bool = True,
                  on_event: Optional[Callable[[str, Any], None]] = None):
         self.log = log
         self.ping_interval = float(ping_interval)
         self.ping_timeout = float(ping_timeout)
         self.token_map = dict(token_map or {})
         self.default_stranger = default_stranger
+        # The real capture shows the chat socket carrying no client chat frames,
+        # so a strict stand-in drops them (the message has to be written out of
+        # band, over HTTP, exactly like the site does).
+        self.accept_socket_sends = bool(accept_socket_sends)
         self.on_event = on_event
         self.conversation_id = "mock-" + _nanoid(10)
         self.messages: List[Dict[str, Any]] = []
@@ -318,6 +323,10 @@ class ChitchatSocketServer:
         # keeps them apart too.
         return {"username": username, "token": token,
                 "id": _nanoid(24), "pid": _nanoid(20), "sid": _nanoid(20)}
+
+    def broadcast(self, event: str, payload: Any) -> None:
+        """Public broadcast, used to mirror out-of-band (HTTP) messages."""
+        self._broadcast(event, payload)
 
     def _broadcast(self, event: str, payload: Any) -> None:
         with self._lock:
@@ -409,6 +418,8 @@ class ChitchatSocketServer:
             self.clients.append(client)
             # Registering the connection joins the match (a reconnect after a
             # closure is a fresh match, hence the roster reset on closure below).
+            # The backend client alone is a valid match: the real site pairs the
+            # account over its session, the page socket is only a listener.
             self.roster = [c for c in self.roster
                            if c["username"] != client["username"]] + [client]
         self.log(f"[MockWS] {who['username']} connected "
@@ -465,6 +476,45 @@ class ChitchatSocketServer:
             ws.close()
             self.log(f"[MockWS] {who['username']} disconnected")
 
+    def publish(self, message: Dict[str, Any]) -> None:
+        """Publish a message that was written out of band (HTTP), like the site.
+
+        The message log belongs to the mock HTTP backend; this mirrors it onto the
+        sockets so both sides hear it as a normal ``chatMessage``.
+        """
+        author = str(message.get("author") or "?")
+        text = str(message.get("text") or "")
+        if not text:
+            return
+        with self._lock:
+            sender = next((c for c in self.clients if c["username"] == author), None)
+            if sender is None:
+                sender = {"id": _nanoid(24), "username": author}
+            if any(str(m.get("id")) == str(message.get("id")) for m in self.messages):
+                return                      # already mirrored (echo from the page)
+            nonce = str(message.get("nonce") or "")
+            node = {
+                "id": _nanoid(24),
+                "conversationId": self.conversation_id,
+                "author": {"id": sender["id"], "username": author, "avatar": sender["id"],
+                           "badges": [], "createdAt": _now_iso(),
+                           "preferences": {"allowFriendRequests": True}},
+                "content": text,
+                "type": "TEXT",
+                "attachments": [],
+                "createdAt": _now_iso(),
+                "status": "SENT",
+                "reactions": [],
+            }
+            if nonce:
+                node["nonce"] = nonce       # the real echo carries the client nonce
+            else:
+                node["flags"] = 0
+            self.messages.append(node)
+            payload = {"message": node}
+        self._broadcast("chatMessage", payload)
+        self._broadcast("matchUpdate", self.match_payload())
+
     def _on_event(self, client: Dict[str, Any], ws: _WebSocket,
                   event: str, data: Any) -> None:
         logger = self.log
@@ -492,6 +542,11 @@ class ChitchatSocketServer:
             return
 
         if event in SEND_EVENTS:
+            if not self.accept_socket_sends:
+                logger(f"[MockWS] {client['username']} sent {event} over the socket — "
+                       f"ignored (the real site writes messages out of band; the socket "
+                       f"only carries the echo back)")
+                return
             text = ""
             if isinstance(data, str):
                 text = data

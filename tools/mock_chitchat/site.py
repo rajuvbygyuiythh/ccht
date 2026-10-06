@@ -20,12 +20,13 @@ handles (``#connected-text``, ``li.select-text`` bubbles with
 from __future__ import annotations
 
 import json
+import random
 import threading
 import time
 from datetime import datetime
 from html import escape as html_escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
 STRANGER_NAME = "Stranger42"
@@ -50,6 +51,11 @@ class ChatBackend:
         # this themselves, so the harness never has to touch another thread's
         # Playwright objects).
         self.states: List[Dict[str, Any]] = []
+        self._conversation_id = "mock-" + "".join(
+            random.choice("abcdefghijklmnopqrstuvwxyz0123456789") for _ in range(10))
+        self._tokens: Dict[str, str] = {}
+        self._message_hooks: List[Callable[[Dict[str, Any]], None]] = []
+        self._api_send_template: Dict[str, Any] = {}
         self.dumped_html: Dict[str, Any] = {}
         self._dump_wanted: Dict[str, int] = {}
         self.api_trace: List[str] = []
@@ -77,8 +83,41 @@ class ChatBackend:
                 self._presence_cv.wait(min(1.0, remaining))
             return True
 
+    # -- the app's own send request (learned by the backend) ---------------
+    def conversation(self) -> str:
+        """The stand-in's conversation id (the real page reads it from the URL)."""
+        with self._lock:
+            return str(self._conversation_id)
+
+    def register_tokens(self, mapping: Dict[str, str]) -> None:
+        """Map a session token to the account it belongs to (like the real site)."""
+        with self._lock:
+            self._tokens.update({str(k): str(v) for k, v in (mapping or {}).items() if k})
+
+    def set_api_send_template(self, template: Dict[str, Any]) -> None:
+        with self._lock:
+            self._api_send_template = dict(template or {})
+
+    def api_send_template(self) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            return dict(self._api_send_template) if self._api_send_template else None
+
+    def sender_for_token(self, token: Any, *, fallback: str = "") -> str:
+        """Who does this token belong to? (the real site reads its session)."""
+        value = str(token or "").strip()
+        if value:
+            with self._lock:
+                for candidate, username in self._tokens.items():
+                    if str(candidate) and str(candidate) in value:
+                        return str(username)
+        return str(fallback or "")
+
     # -- messages ---------------------------------------------------------
-    def add(self, author: str, text: str) -> Dict[str, Any]:
+    def on_message_added(self, callback) -> None:
+        """Called with every new message (the ws stand-in broadcasts them)."""
+        self._message_hooks.append(callback)
+
+    def add(self, author: str, text: str, nonce: str = "") -> Dict[str, Any]:
         with self._lock:
             message = {
                 "id": len(self._messages) + 1,
@@ -86,11 +125,20 @@ class ChatBackend:
                 "text": str(text or ""),
                 "ts": time.time(),
             }
+            if nonce:
+                # The real server echoes the client's nonce back on the message,
+                # which is how "this one is mine" is recognised on the socket.
+                message["nonce"] = str(nonce)
             self._messages.append(message)
         try:
             self._log(f"[MockChat] {message['author']}: {message['text']}")
         except Exception:
             pass
+        for hook in list(self._message_hooks):
+            try:
+                hook(dict(message))
+            except Exception:
+                pass
         return message
 
     def since(self, after_id: int) -> Tuple[List[Dict[str, Any]], int]:
@@ -228,6 +276,7 @@ _CHAT_BODY = """
   var DEBUG = __DEBUG_JSON__;
   var WS_URL = __WS_JSON__;
   var TRANSPORT = __TRANSPORT_JSON__;
+  var CONNECT_SOCKET = __CONNECT_SOCKET_JSON__;
   var since = 0;
   var rendered = {};
   var box = document.getElementById('messages');
@@ -235,11 +284,39 @@ _CHAT_BODY = """
   var sio = null;              // this page's own chat socket (ws mode)
   var conversationId = '';
 
+  // The page knows which conversation it is in (the real one reads the URL).
+  fetch(API + '/api/conversation').then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data && data.conversationId) { conversationId = data.conversationId; }
+    }).catch(function () {});
+
   // ---- ws mode: the page speaks Engine.IO v4 + Socket.IO itself ----------
   function sioSend(event, payload) {
     if (!sio || sio.readyState !== 1) { return false; }
     sio.send('42' + JSON.stringify(payload === undefined ? [event] : [event, payload]));
     return true;
+  }
+
+  // The real site does NOT send chat text over the socket: the message is
+  // written out of band (HTTP POST) and the socket only *listens* for it coming
+  // back.  The mock page does the same, so the backend has to learn that
+  // request (or its own socket emit is simply ignored — exactly like the site).
+  function newNonce() {
+    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    var out = '';
+    for (var i = 0; i < 21; i++) { out += chars.charAt(Math.floor(Math.random() * chars.length)); }
+    return out;
+  }
+
+  function sendViaHttp(text) {
+    var token = (document.cookie.match(/(?:^|;\s*)token=([^;]+)/) || [])[1] || '';
+    return fetch(API + '/api/conversations/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversationId: conversationId, content: text,
+                             type: 'TEXT', status: 'SENT', token: token,
+                             nonce: newNonce() })
+    }).then(function (r) { return r.ok; });
   }
 
   function connectSocket() {
@@ -365,8 +442,12 @@ _CHAT_BODY = """
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ author: ME })
   }).catch(function () {});
-  if (TRANSPORT === 'ws' && WS_URL) {
+  if (TRANSPORT === 'ws' && WS_URL && CONNECT_SOCKET) {
     connectSocket();
+  } else if (TRANSPORT === 'ws' && WS_URL) {
+    // The real page also has a socket, but a WS-only test may disable it: the
+    // page then only writes messages (HTTP) and never listens on a socket.
+    status.textContent = 'page socket disabled (message writes still go out)';
   } else {
     setInterval(poll, 700);
     poll();
@@ -377,9 +458,10 @@ _CHAT_BODY = """
     var text = (el.value || '').trim();
     if (!text) { return; }
     el.value = '';
-    if (sioSend('sendMessage', { conversationId: conversationId, content: text,
-                                 type: 'TEXT' })) {
-      return;                       // the server echoes it back as a chatMessage
+    if (TRANSPORT === 'ws' && WS_URL) {
+      // like the real site: out of band (HTTP), the socket only listens
+      sendViaHttp(text);
+      return;
     }
     fetch(API + '/api/send', {
       method: 'POST',
@@ -428,7 +510,8 @@ def page_html(path: str,
               stranger: str = STRANGER_NAME,
               debug: bool = False,
               ws_url: str = "",
-              transport: str = "dom") -> str:  # noqa: D417
+              transport: str = "dom",
+              connect_socket: bool = True) -> str:  # noqa: D417
     """Return the HTML for one mock page.
 
     ``transport="ws"`` makes the chat page speak Engine.IO v4 + Socket.IO to
@@ -445,6 +528,8 @@ def page_html(path: str,
     html = _PAGE.replace("__TITLE__", title).replace("__BODY__", body)
     # The JSON variants are filled first: they carry the name as a *quoted* JS
     # string, so names with dots/spaces ("sadia.6.7") stay valid script.
+    html = html.replace("__CONNECT_SOCKET_JSON__",
+                        "true" if connect_socket else "false")
     html = (html.replace("__ME_JSON__", json.dumps(str(me)))
                 .replace("__API_JSON__", json.dumps(str(api_base or "").rstrip("/")))
                 .replace("__WS_JSON__", json.dumps(str(ws_url or DEFAULT_WS_URL)))
@@ -509,6 +594,8 @@ def make_handler(backend: ChatBackend,
                                    "dump": backend.take_dump_request()})
             if path == "/api/all":
                 return self._json({"messages": backend.all()})
+            if path == "/api/conversation":
+                return self._json({"conversationId": backend.conversation()})
             if path in ("/", "/start/new", "/chat", "/chat/"):
                 me = me_for_page(self.headers)
                 html = page_html(path, me=me, api_base=api_base_for_page(self.headers),
@@ -517,10 +604,20 @@ def make_handler(backend: ChatBackend,
                 return self._send(200, html.encode("utf-8"))
             return self._send(404, b"not found")
 
+        def _author_from_cookie(self):
+            """The session cookie names the sender (the real site reads it too)."""
+            cookie = self.headers.get("Cookie") or ""
+            for part in cookie.split(";"):
+                name, _, value = part.strip().partition("=")
+                if name.strip() == "token" and value.strip():
+                    return backend.sender_for_token(value.strip())
+            return ""
+
         def do_POST(self):
             parsed = urlparse(self.path)
             if parsed.path not in ("/api/send", "/api/hello", "/api/leave",
-                                   "/api/state", "/api/dump"):
+                                   "/api/state", "/api/dump",
+                                   "/api/conversations/send"):
                 return self._send(404, b"not found")
             try:
                 length = int(self.headers.get("Content-Length") or 0)
@@ -539,6 +636,15 @@ def make_handler(backend: ChatBackend,
             if parsed.path == "/api/dump":
                 backend.note_dump(payload.get("author") or "bot", payload.get("html"))
                 return self._json({"ok": True})
+            if parsed.path == "/api/conversations/send":
+                # the site's own out-of-band write (the socket only carries the echo)
+                author = backend.sender_for_token(
+                    payload.get("token"),
+                    fallback=str(payload.get("author") or self._author_from_cookie()))
+                message = backend.add(author,
+                                      payload.get("content") or payload.get("text"),
+                                      nonce=payload.get("nonce"))
+                return self._json({"ok": True, "message": message})
             message = backend.add(payload.get("author"), payload.get("text"))
             return self._json({"ok": True, "message": message})
 

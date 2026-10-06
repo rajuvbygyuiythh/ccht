@@ -39,10 +39,12 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from core.chat_ws import (ChatWebSocket, DEFAULT_WS_URL, chat_bundle_urls,  # noqa: E402
-                          cookies_header, discover_send_event, load_session_cookies)
+                          cookies_header, discover_send_event, http_send_clues,
+                          load_session_cookies, load_ws_config, save_ws_config,
+                          ws_config_path)
 from core.socketio import SocketIOClient  # noqa: E402
 
-WS_CONFIG = REPO / "data" / "ws_config.json"
+WS_CONFIG = ws_config_path()          # EVA_WS_CONFIG overrides it (tests)
 
 
 def log(message: str) -> None:
@@ -67,21 +69,34 @@ def load_accounts(pattern: str = "") -> List[Dict[str, Any]]:
 
 
 def ws_config() -> Dict[str, Any]:
+    return load_ws_config()
+
+
+def remember_config(**updates) -> None:
+    """Save and tell the user *what* was remembered (send event, HTTP request)."""
+    save_ws_config(**updates)
+    what = ", ".join(sorted(k for k, v in updates.items() if v))
     try:
-        return json.loads(WS_CONFIG.read_text(encoding="utf-8"))
+        where = WS_CONFIG.relative_to(REPO)
     except Exception:
-        return {}
+        where = WS_CONFIG
+    log(f"[WS] remembered {what} in {where}")
 
 
-def save_ws_config(**updates) -> None:
-    data = ws_config()
-    data.update({k: v for k, v in updates.items() if v})
-    try:
-        WS_CONFIG.parent.mkdir(parents=True, exist_ok=True)
-        WS_CONFIG.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        log(f"[WS] remembered the confirmed send event in {WS_CONFIG.relative_to(REPO)}")
-    except Exception as error:
-        log(f"[WS] could not save {WS_CONFIG.name}: {error}")
+def describe_config(config: Dict[str, Any]) -> None:
+    """Print what the bot already knows about this site/account."""
+    log("[WS] learned settings:")
+    log(f"  send event : {config.get('send_event') or '<unknown>'}")
+    template = config.get("http_send") or {}
+    if template:
+        log(f"  http send  : {template.get('method')} {template.get('url')}")
+        log(f"               content={template.get('content_field')!r} "
+            f"nonce={template.get('nonce_field') or '-'} "
+            f"conversation={template.get('conversation_field') or '-'}")
+    else:
+        log("  http send  : <not learned yet> (it is learned automatically the "
+            "first time the page sends a message)")
+    log(f"  username   : {config.get('username') or '<unknown>'}")
 
 
 # --------------------------------------------------------------------------- #
@@ -357,7 +372,11 @@ def har_report(path: str) -> int:
             log(f"    raw:   {frame[:200]}")
     else:
         log("✗ no client-side chat *send* frame in this capture (only handshake,")
-        log("  presenceSync and pongs). To nail the exact send event, in DevTools →")
+        log("  presenceSync and pongs) — so the site does NOT send chat text over")
+        log("  this socket: it writes the message out of band (HTTP) and hears the")
+        log("  echo back over the socket.  The bot learns that request and replays it")
+        log("  (see docs/WS_CHAT_PROTOCOL.md, 'sending a message').")
+        log("  To nail an exact socket send event (if the site also accepts one), in DevTools →")
         log("  Network → WS, click the socket, then type + send one message and")
         log("  export the HAR again; or run --probe on a machine that can reach the")
         log("  site (it reads the event name straight out of the chat bundle).")
@@ -371,11 +390,19 @@ def har_report(path: str) -> int:
 def bundle_report(path: str) -> int:
     text = Path(path).read_text(encoding="utf-8", errors="replace")
     names = discover_send_event(text, limit=12)
-    log(f"candidate send events in {path}:")
+    log(f"candidate socket send events in {path}:")
     for name in names:
         log(f"  {name}")
     if not names:
         log("  (none found — is this the right bundle?)")
+    clues = http_send_clues(text)
+    log("")
+    log("candidate HTTP send endpoints in the bundle (the capture shows the site")
+    log("sends chat text out of band and only listens on the socket):")
+    for clue in clues:
+        log(f"  {clue}")
+    if not clues:
+        log("  (none found — look for fetch(/axios.post calls near \"messages\")")
     return 0
 
 
@@ -399,6 +426,11 @@ def run_live(args) -> int:
     send_event = args.send_event or config.get("send_event") or ""
     if send_event:
         log(f"[WS] send event: {send_event} (from {'--send-event' if args.send_event else 'data/ws_config.json'})")
+    http_send = dict(config.get("http_send") or {}) if not args.no_http_send else {}
+    if http_send:
+        log(f"[WS] the site's own send request is known: "
+            f"{http_send.get('method')} {http_send.get('url')} "
+            f"(replies go out that way, --no-http-send forces the socket)")
 
     chat = ChatWebSocket(
         cookie_header=header,
@@ -410,6 +442,8 @@ def run_live(args) -> int:
         on_message=lambda text, _msg: log(f"[SMS]   user: {text}"),
         on_match=lambda match: log("[WS] match is live — you can chat now"),
     )
+    if http_send:
+        chat.set_http_send(http_send)
     chat.start()
     if not chat.wait_connected(args.wait):
         log(f"[WS] ✗ could not connect within {args.wait:.0f}s: {chat.client.last_error}")
@@ -584,6 +618,10 @@ def main() -> int:
                         help="keep listening after --send")
     parser.add_argument("--reply", action="store_true",
                         help="answer incoming messages with ChatRuleBot")
+    parser.add_argument("--no-http-send", action="store_true",
+                        help="ignore the learned HTTP send request (force the socket)")
+    parser.add_argument("--forget-config", action="store_true",
+                        help="drop everything learned (send event + HTTP send) and exit")
     parser.add_argument("--probe", action="store_true",
                         help="read the send event name from the chat bundle (browser)")
     parser.add_argument("--send-event", default="", help="override the send event name")
@@ -599,6 +637,9 @@ def main() -> int:
                         help="read the account's own username from the app (browser, "
                              "one-time; remembered in data/ws_config.json)")
     parser.add_argument("--bundle", default="", help="rank emit names in a saved JS bundle")
+    parser.add_argument("--show-config", action="store_true",
+                        help="print what the bot learned (send event, HTTP send, "
+                             "username) and exit")
     args = parser.parse_args()
 
     if args.list:
@@ -616,6 +657,13 @@ def main() -> int:
                              username=args.username or str(ws_config().get("username") or ""))
     if args.bundle:
         return bundle_report(args.bundle)
+    if args.show_config:
+        describe_config(ws_config())
+        return 0
+    if args.forget_config:
+        save_ws_config(send_event="", http_send={}, username="")
+        log("[WS] forgotten: send event, HTTP send request, username")
+        return 0
     return run_live(args)
 
 
