@@ -21,7 +21,7 @@ prove and which the bot therefore verifies at runtime instead of trusting.
 |-----------|-------|---------|
 | server → client | `0{"sid":"…","upgrades":[],"pingInterval":25000,"pingTimeout":20000,"maxPayload":1000000}` | Engine.IO handshake |
 | client → server | `40{"release":"fe4859ad7dbcce70f8c68229cd37a5edbe8cc661"}` | Socket.IO connect (the site's release id) |
-| server → client | `40{"sid":"…","pid":"…"}` | namespace connected — `pid` **is the account's own profile id** |
+| server → client | `40{"sid":"…","pid":"…"}` | namespace connected — `pid` is the **session id**, *not* a profile id (see below) |
 | client → server | `42["presenceSync"]` | joined the presence channel |
 | server → client | `42["onlineFriends",[]]` | friends list (empty in the capture) |
 | server → client | `42["matchUpdate",{…}]` | the match/conversation the account is in |
@@ -64,6 +64,52 @@ Ending a chat (capture): another `matchUpdate` whose conversation carries
 "closure": {"closed": true, "closeReason": "INTENTIONAL", "closedBy": "<profile id>"}
 ```
 
+## Who am I? (the capture corrects two easy mistakes)
+
+*The socket ``pid`` is a session id.* In the capture it is a 20-char nanoid
+(`bcLYPx5BjAjHVzzBAbdt`) while the account's *profile* id in `matchUpdate` is a
+24-char hex value (`6ac278aff4b9c168f1a77460`).  They never match, so the account
+cannot be found by comparing `pid` with a participant.  The bot therefore learns
+its own identity from, in order:
+
+1. the page (`browser/chat_reader.py` → `myUsername`), i.e. what the app shows for
+   the logged-in account — `tools/ws_chat.py --identity` stores it once;
+2. its **own echo**: the first message we send comes back with our author id, and
+   that id is remembered (`ChatWebSocket.my_id`);
+3. the **nonce**: the capture shows our own messages coming back carrying
+   `nonce` (the client-generated id) and **no** `flags`, while the other side's
+   messages carry `flags: 0` and no `nonce`.  A matching nonce is therefore the
+   most exact "this one is my echo" signal — and the bot now sends a nonce with
+   every message it emits.
+
+`matchUpdate` also carries `messageCount` and `lastMessage` (kept in the log), and
+the closure carries `closedBy` — a *profile* id, e.g. the stranger who pressed
+SKIP.
+
+## Proving a chat ran on the socket alone
+
+The conversation *is* the socket, but a bug could silently hide behind the DOM
+fallback.  ``tools/e2e_mock_chat.py`` therefore has a WS-only mode:
+
+```bash
+python3 tools/e2e_mock_chat.py --transport ws --bot-page-blind --debug \
+        --artifacts /home/user/ws_e2e_artifacts --log /home/user/demo_ws_chat.log
+```
+
+* the bot's page is served a **blind DOM** — the user's messages are never handed
+  to that context, so they cannot be read from the page at all;
+* the bot's page opens **no** socket, so the only socket the account has is the
+  backend client (``tools/session_chat.py --transport ws``);
+* the user is a second real browser, connected to the same stand-in with a real
+  browser WebSocket;
+* the verdict fails if the reply went through the DOM fallback (``(dom fallback)``
+  in the log) or if any user text shows up in the bot page's DOM dumps.
+
+A passing run therefore proves: detection came from ``chatMessage`` events, the
+reply went out as a frame, the server echo confirmed it, and the cookies of the
+restored session authenticated the socket (the stand-in identifies the account by
+its cookie jar — exactly how the real endpoint does).
+
 ## The one unknown: the *send* event name
 
 The capture contains only handshake / `presenceSync` / pong frames from the
@@ -87,6 +133,45 @@ send one message, then export the HAR and run
 ```bash
 python3 tools/ws_chat.py --har ws.txt     # prints the client frames it found
 ```
+
+## Replaying a capture offline (does the bot understand *this* recording?)
+
+```bash
+python3 tools/ws_chat.py --replay ws.txt                 # what the bot would see
+python3 tools/ws_chat.py --replay ws.txt --username sadia.6.7
+python3 tools/ws_chat.py --identity --account EMAIL      # learn the username once
+```
+
+`--replay` feeds the captured server frames through the exact parsing the live
+bot uses and prints the conversation, the participants, which messages would be
+answered, the closure, and the event counts — no browser, no network.
+
+Both *file styles* work: a DevTools HAR export (``Copy all as HAR``) **and** a
+plain text ``ws.txt`` dump (the WS pane copied/pasted, with ``↑``/``↓`` arrows,
+``send``/``receive`` words, or ``{"type": "send", "data": "42[… ]"}`` objects).
+A line without any direction marker is classified from the frame itself — only
+events the client alone emits (``presenceSync``, ``sendMessage``, ``skip``…) count
+as outgoing, everything else (``chatMessage``, ``typing``, ``matchUpdate``…) is
+incoming.
+
+To prove the *whole* path offline, the test suite keeps two copies of one
+capture: ``test_fixtures/chitchat_ws_capture.json`` (HAR) and
+``test_fixtures/chitchat_ws_dump.txt`` (plain dump). Both must split and replay
+identically (20 received / 7 sent, 2 incoming / 5 ours).  The test
+suite replays `test_fixtures/chitchat_ws_capture.json`, a fixture with the frame
+sequence and payload shapes of the real capture (ids replaced): it must report
+`2 incoming / 5 own`, `messages=7`, `last=MSG_0007` and the closure.
+
+Working assumptions the capture *does* prove (all covered by tests):
+
+| Fact from the capture | Where the bot uses it |
+|-----------------------|------------------------|
+| `pid` ≠ profile id | identity comes from the page/echo, never from `pid` |
+| own messages come back with `nonce`, no `flags` | echo/dedupe + "is this mine" |
+| the other side's messages have `flags: 0` | "this is an incoming SMS" |
+| `onlineFriends` answers `presenceSync` | connect handshake |
+| closure: `matchUpdate` + `conversation.closure{closed, closeReason, closedBy}` | ending a chat cleanly |
+| Engine.IO ping `2` every 25 s → answer `3` | the connection stays alive |
 
 ## Where the bot uses it
 

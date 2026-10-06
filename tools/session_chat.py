@@ -251,6 +251,17 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
     """
     from core.chat_ws import DEFAULT_WS_URL, ChatWebSocket, cookies_header
 
+    # Whatever a previous run learned (--probe / --identity) is reused, so the
+    # backend can start chatting without any extra flags.
+    learned = {}
+    try:
+        learned = json.loads((ROOT / "data" / "ws_config.json").read_text(encoding="utf-8"))
+    except Exception:
+        learned = {}
+    send_event = send_event or str(learned.get("send_event") or "")
+    if send_event:
+        log(f"  [WS] send event from data/ws_config.json: {send_event}")
+
     started = time.time()
     counts = {"messages_in": 0, "messages_out": 0}
     stop_reason = "finished"
@@ -298,7 +309,13 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
         log(f"  [WS] {len(cookies)} browser cookies · "
             f"{len(header.split(';')) if header else 0} for chitchat.gg")
 
-        username = _page_username(automation, page, log=log)
+        username = _page_username(automation, page, log=log) \
+            or str(learned.get("username") or "")
+        if username:
+            log(f"  [WS] account identity: username={username!r}")
+        else:
+            log("  [WS] account identity unknown — messages from the other side "
+                "are still detected, but our own echo is recognised by its nonce")
         if probe:
             try:
                 from core.chat_ws import probe_send_events_from_page
@@ -338,13 +355,19 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
                 try:
                     if automation.send_chat_message(page, reply, 1):
                         counts["messages_out"] += 1
+                        # The page's own socket will echo it back — remember the
+                        # text so the echo is not mistaken for a new SMS.
+                        try:
+                            chat.note_sent_text(reply)
+                        except Exception:
+                            pass
                         log(f"  [REPLY] bot: {reply}   (dom fallback)")
                 except Exception as error:
                     log(f"  [WS] dom fallback failed: {error}")
 
         chat = ChatWebSocket(cookie_header=header, url=ws_url or DEFAULT_WS_URL,
                              my_username=username, send_event=send_event,
-                             log=log, on_message=answer)
+                             allow_probe=bool(probe), log=log, on_message=answer)
         chat.start()
         if not chat.wait_connected(30.0):
             log(f"  [WS] socket did not connect: {chat.client.last_error}")

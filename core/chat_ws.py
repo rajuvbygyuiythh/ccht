@@ -26,7 +26,9 @@ from __future__ import annotations
 
 import json
 import queue
+import random
 import re
+import string
 import threading
 import time
 from pathlib import Path
@@ -114,6 +116,7 @@ class ChatWebSocket:
                  cookies: Optional[Iterable[Dict[str, Any]]] = None,
                  url: str = DEFAULT_WS_URL,
                  my_username: str = "",
+                 my_id: str = "",
                  send_event: str = "",
                  log: Callable[[str], None] = print,
                  on_message: Optional[Callable[[str, Dict[str, Any]], None]] = None,
@@ -127,6 +130,7 @@ class ChatWebSocket:
                  namespace_payload: Optional[Dict[str, Any]] = None):
         self.url = str(url)
         self.my_username = str(my_username or "")
+        self.my_id = str(my_id or "")
         self.send_event = str(send_event or "")
         self.sent_event: str = ""          # the one that actually worked
         self.log = log
@@ -157,10 +161,14 @@ class ChatWebSocket:
         self.participants: List[Dict[str, Any]] = []
         self._handlers: "queue.Queue[Any]" = queue.Queue()
         self._handler_thread: Optional[threading.Thread] = None
+        #: replay/tests: run callbacks on the calling thread instead of the worker
+        self.deliver_inline = False
         self.messages: List[Dict[str, Any]] = []
         self.messages_in = 0
         self.messages_out = 0
         self.echoes: List[str] = []
+        self.nonces: List[str] = []          # nonces of our own sent messages
+        self._echo_nonce = ""
         self.closed_by_peer = False
         self._lock = threading.Lock()
         self._echo_event = threading.Event()
@@ -194,6 +202,12 @@ class ChatWebSocket:
     def _dispatch(self, callback: Optional[Callable], *args) -> None:
         if callback is None:
             return
+        if self.deliver_inline:
+            try:
+                callback(*args)
+            except Exception as error:
+                self.log(f"[WS] handler failed: {type(error).__name__}: {error}")
+            return
         self._handlers.put((callback, args))
 
     def wait_connected(self, timeout: float = 20.0) -> bool:
@@ -225,10 +239,23 @@ class ChatWebSocket:
             self._handle_message(payload)
         elif event == "typing":
             user_id = (payload or {}).get("userId") if isinstance(payload, dict) else ""
-            if user_id and user_id != self.client.pid:
+            # ``userId`` is a *profile* id; the socket ``pid`` is a session id, so
+            # they never match — only our own profile id means "we are typing".
+            if user_id and user_id != self.my_id:
                 self.log(f"[WS] typing… (user {str(user_id)[:8]})")
         elif event == "onlineFriends":
             self.log(f"[WS] onlineFriends: {payload}")
+
+    @staticmethod
+    def _new_nonce() -> str:
+        """A client-generated id for one message (the site echoes it back).
+
+        The capture shows our own message coming back with a ``nonce`` while the
+        other side's messages have none — so a matching nonce is the most exact
+        "this is my echo" signal there is.
+        """
+        alphabet = string.ascii_letters + string.digits + "_-"
+        return "".join(random.choice(alphabet) for _ in range(21))
 
     # ------------------------------------------------------------------ #
     #  protocol helpers
@@ -247,14 +274,23 @@ class ChatWebSocket:
                  for p in participants]
         names = [n for n in names if n]
         if names and not self.my_username:
-            # Learn who we are: the socket knows its own profile id.
+            # The capture shows ``pid`` is a *session* id, not a profile id, so it
+            # cannot identify us here.  Use the profile we already know (from the
+            # page or from our own echo) and otherwise leave the name for later.
             for entry in participants:
                 profile = entry.get("profile") or {}
-                if str(profile.get("id") or "") == self.client.pid:
+                if self.my_id and str(profile.get("id") or "") == self.my_id:
                     self.my_username = str(profile.get("username") or "")
                     break
+        count = match.get("messageCount") if isinstance(match, dict) else None
+        last = match.get("lastMessage") if isinstance(match, dict) else None
+        extra = ""
+        if count is not None:
+            extra += f" messages={count}"
+        if last:
+            extra += f" last={str(last)[:10]}"
         self.log(f"[WS] matchUpdate: conversation={self.conversation_id[:12]} "
-                 f"participants={names} closed={bool(closure.get('closed'))}")
+                 f"participants={names} closed={bool(closure.get('closed'))}{extra}")
         if closure.get("closed"):
             self.closed_by_peer = True
             self.log(f"[WS] the chat was closed (by={str(closure.get('closedBy'))[:8]}, "
@@ -262,40 +298,132 @@ class ChatWebSocket:
         if not closure.get("closed"):
             self._dispatch(self.on_match, match)
 
+    def _is_mine(self, message: Dict[str, Any], author: str, text: str) -> bool:
+        """Decide whether an incoming ``chatMessage`` is our own message.
+
+        Three independent signals, because the capture shows the old assumption
+        (``pid`` == own profile id) is wrong:
+
+        1. the author id we learned from an earlier echo of our own message,
+        2. the username the page reported (the app knows who is logged in),
+        3. the text of a message we just sent (``nonce`` is the site's own marker
+           for "sent by this client" and is used as a last resort).
+        """
+        author_id = str((message.get("author") or {}).get("id") or "")
+        if self.my_id and author_id and author_id == self.my_id:
+            return True
+        if self.my_username and author and author == self.my_username:
+            return True
+        if text and text in self.echoes:
+            return True
+        nonce = str(message.get("nonce") or "")
+        if nonce and nonce in self.nonces:
+            return True
+        if nonce and not (self.my_username or self.my_id):
+            # Nothing else identifies us yet: the site only echoes a nonce to the
+            # client that sent it.
+            return True
+        return False
+
     def _handle_message(self, payload: Any) -> None:
         message = (payload or {}).get("message") if isinstance(payload, dict) else None
         if not isinstance(message, dict):
             return
-        author = (message.get("author") or {}).get("username") or ""
+        author = str((message.get("author") or {}).get("username") or "")
+        author_id = str((message.get("author") or {}).get("id") or "")
         text = str(message.get("content") or "")
         with self._lock:
             self.messages.append(message)
-            mine = bool(self.my_username) and author == self.my_username
+            mine = self._is_mine(message, author, text)
             if mine:
+                # Learn who we are from our own echo — the strongest identity
+                # signal available to the socket (pid is only a session id).
+                if author_id and not self.my_id:
+                    self.my_id = author_id
+                if author and not self.my_username:
+                    self.my_username = author
                 self.messages_out += 1
             else:
                 self.messages_in += 1
-        if not self.my_username and text in self.echoes:
-            mine = True
         if mine:
             self.log(f"[WS] echo of our own message ({message.get('status')}): {text[:60]}")
-            if text and text == self._echo_text:
+            nonce = str(message.get("nonce") or "")
+            if (text and text == self._echo_text) or (nonce and nonce == self._echo_nonce):
                 self._echo_event.set()
             return
         self.log(f"[WS] incoming SMS from {author}: {text[:80]}")
         self._dispatch(self.on_message, text, message)
 
     # ------------------------------------------------------------------ #
+    #  offline replay (no socket): feed captured server frames
+    # ------------------------------------------------------------------ #
+    def feed(self, frame: str) -> None:
+        """Process one raw *server* frame without a socket.
+
+        Used by ``tools/ws_chat.py --replay`` and the tests to check what the bot
+        would have seen in a real capture (``_webSocketMessages`` of type
+        ``receive``).
+        """
+        text = str(frame or "").strip()
+        if not text:
+            return
+        if text.startswith("0"):
+            return                      # engine.io handshake
+        if text.startswith("40"):
+            try:
+                ack = json.loads(text[2:] or "{}")
+            except Exception:
+                ack = {}
+            self.client.sid = str(ack.get("sid") or self.client.sid)
+            self.client.pid = str(ack.get("pid") or self.client.pid)
+            self.log("[WS] (replay) socket.io connected: "
+                     f"sid={self.client.sid[:10]} pid={self.client.pid[:10]} "
+                     "(pid = session id, not a profile id)")
+            return
+        if text.startswith("41"):
+            self.closed_by_peer = True
+            return
+        if text.startswith("42"):
+            try:
+                event, *rest = json.loads(text[2:])
+            except Exception:
+                return
+            payload = rest[0] if rest else None
+            self.client.event_counts[str(event)] = \
+                self.client.event_counts.get(str(event), 0) + 1
+            self._on_event(str(event), payload)
+            return
+        # "2" (ping) / "3" (pong) / anything else: nothing for the chat layer
+
+    # ------------------------------------------------------------------ #
     #  sending
     # ------------------------------------------------------------------ #
-    def _payload_for(self, shape: str, text: str) -> Dict[str, Any]:
+    def _payload_for(self, shape: str, text: str, nonce: str = "") -> Dict[str, Any]:
         if shape == "nested":
-            return {"conversationId": self.conversation_id,
-                    "message": {"content": text, "type": "TEXT"}}
-        if shape == "minimal":
-            return {"content": text}
-        return {"conversationId": self.conversation_id, "content": text,
-                "type": "TEXT", "status": "SENT"}
+            payload = {"conversationId": self.conversation_id,
+                       "message": {"content": text, "type": "TEXT"}}
+        elif shape == "minimal":
+            payload = {"content": text}
+        else:
+            payload = {"conversationId": self.conversation_id, "content": text,
+                       "type": "TEXT", "status": "SENT"}
+        if nonce and shape != "minimal":
+            # Same field name the site uses for a client-generated message id.
+            payload["nonce"] = nonce
+        return payload
+
+    def note_sent_text(self, text: str) -> None:
+        """Remember a message that left through another path (the DOM fallback).
+
+        Without this the page's own echo would look like an incoming message and
+        the bot would answer itself.
+        """
+        text = str(text or "").strip()
+        if not text:
+            return
+        with self._lock:
+            self.echoes.append(text)
+            del self.echoes[:-200]
 
     def send_message(self, text: str, *, wait_for_echo: bool = True,
                      timeout: Optional[float] = None) -> Tuple[bool, str]:
@@ -323,11 +451,16 @@ class ChatWebSocket:
         # Only a *known* event gets the extra payload shapes: for a guess we do
         # not want to fire three variants of the same wrong event.
         shapes = list(PAYLOAD_SHAPES) if configured else ["flat"]
+        nonce = self._new_nonce()
+        with self._lock:
+            self.nonces.append(nonce)
+            del self.nonces[:-200]
         for event in ordered:
             for shape in shapes:
-                payload = self._payload_for(shape, text)
+                payload = self._payload_for(shape, text, nonce)
                 self._echo_event.clear()
                 self._echo_text = text
+                self._echo_nonce = nonce
                 with self._lock:
                     self.echoes.append(text)
                 if not self.client.emit(event, payload):
@@ -353,6 +486,7 @@ class ChatWebSocket:
         base.update({
             "conversation": self.conversation_id,
             "my_username": self.my_username,
+            "my_id": self.my_id,
             "participants": [str((p.get("profile") or {}).get("username") or "")
                              for p in self.participants],
             "messages_in": self.messages_in,

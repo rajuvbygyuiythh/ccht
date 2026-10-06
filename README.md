@@ -92,6 +92,7 @@ data/requirements.txt` → `python -m playwright install chromium`.
 | `python test_ws_transport.py` | chat WebSocket (Engine.IO v4 + Socket.IO) | **50/50 passed** |
 | `python3 tools/e2e_mock_chat.py` | **real browser E2E** (DOM transport) | **PASS** (see v2.7 below) |
 | `python3 tools/e2e_mock_chat.py --transport ws` | **real browser E2E** (socket transport) | **PASS** (see v2.8 below) |
+| `python3 tools/e2e_mock_chat.py --transport ws --bot-page-blind` | **WS-only proof**: the bot's page never renders the user's text | **PASS** 19/19 (see v2.8 below) |
 | `python tools/live_chat.py` | flow (default) | interactive REPL |
 
 ## Project layout
@@ -265,6 +266,9 @@ python3 tools/e2e_mock_chat.py                     # full conversation (headless
 python3 tools/e2e_mock_chat.py --connect-only      # connect test only: fingerprint + session
 python3 tools/e2e_mock_chat.py --session data/account_sessions/account_xxx --visible
 python3 tools/e2e_mock_chat.py --log /tmp/e2e.log  # transcript to a file
+# socket-only proof: blind bot page (no user text in its DOM, no page socket) +
+# cookie-authenticated backend socket + a real browser for the user side
+python3 tools/e2e_mock_chat.py --transport ws --bot-page-blind --debug
 ```
 
 A **second real browser** plays the stranger: it types a message into the same
@@ -331,7 +335,8 @@ conversation there — no DOM polling for the messages and no typing for the rep
 wss://api.chitchat.gg/socket.io/?EIO=4&transport=websocket
   0{…}            ← engine.io handshake (ping 25 s)
   40{release}     → handshake with the site's release id
-  ← 40{sid,pid}      the pid is the account's own profile id
+  ← 40{sid,pid}      the pid is a *session* id — the account is identified by
+                     its cookies and its own echo (never by this pid)
   → 42["presenceSync"]
   ← 42["matchUpdate", {match:{conversation:{…}}}]     the chat to talk in
   ← 42["chatMessage", {message:{author, content}}]    incoming SMS
@@ -363,6 +368,13 @@ python tools/ws_chat.py --account EMAIL --reply --probe    # learn the send even
 # protocol report from a HAR capture / from a saved JS bundle
 python tools/ws_chat.py --har ws.txt
 python tools/ws_chat.py --bundle js-direct-chat.js
+
+# replay a capture offline: "does the bot detect the SMS in *this* recording?"
+# (a DevTools HAR export or a plain text frame dump both work)
+python tools/ws_chat.py --replay ws.txt
+# read the account's own username from the app once (the socket pid is only a
+# session id — see docs/WS_CHAT_PROTOCOL.md) and remember it
+python tools/ws_chat.py --identity --account EMAIL
 ```
 
 **The send event name.** The capture does not contain the client frame that sends
@@ -392,11 +404,22 @@ v4 + Socket.IO to it.  The added checks:
 |-------|----------------|
 | engine.io + socket.io handshake completed | real socket, real frames |
 | the restored session cookies went out on the socket handshake | the socket is authenticated by `storage_state.json` (cookie/token only) |
-| the account identity came from its own session (pid match) | `40{pid}` ↔ `matchUpdate` participants |
+| the account identity came from its own session | the saved cookies + the account's own echo (the socket `pid` is only a session id) |
 | incoming SMS was read from `chatMessage` events | detection is socket-side, not DOM |
 | the reply was confirmed by the server echo | the reply really left the bot over the socket |
 | no DOM fallback was needed | the reply was not typed into the page |
 | the chat closure travelled over the socket | `closure{closed:true}` handling |
+
+With `--bot-page-blind` the same run becomes the strict **WS-only proof**: the
+bot's own page is served a *blind* DOM (the user's messages are never handed to
+that context) and opens no socket at all, so the account's only socket is the
+backend client — and the cookie authentication of that socket is what the
+stand-in reports as the account name.  Two extra checks join the table:
+
+| Check | What it proves |
+|-------|----------------|
+| the bot's page DOM never carried the user's message | the words could not have been read from the page (states + HTML dumps scanned) |
+| the SMS was detected from socket events only | detection came from `chatMessage` frames — the DOM was blind by construction |
 
 The run also writes `ws_transcript.json` (every frame the stand-in sent, the
 cookie names on the handshake, the transcript) next to the other artifacts.

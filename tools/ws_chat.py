@@ -8,6 +8,9 @@
     python3 tools/ws_chat.py --account EMAIL --reply --probe   # learn the send event
 
     python3 tools/ws_chat.py --har ws.txt                  # protocol report from a HAR
+    python3 tools/ws_chat.py --replay ws.txt               # what the bot sees in it
+    #   ^ a DevTools HAR export or a plain text frame dump, both work
+    python3 tools/ws_chat.py --identity --account EMAIL    # read the username off the app
     python3 tools/ws_chat.py --bundle js-direct-chat.js    # rank the emit names
 
 The socket talks ``wss://api.chitchat.gg/socket.io/?EIO=4&transport=websocket``
@@ -23,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -84,12 +88,216 @@ def save_ws_config(**updates) -> None:
 #  HAR report — what does the capture actually contain?
 # --------------------------------------------------------------------------- #
 
+def har_entries(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The entries of a HAR, whether it is the full file or the ``log`` object."""
+    if isinstance(data, dict):
+        log_part = data.get("log")
+        if isinstance(log_part, dict) and isinstance(log_part.get("entries"), list):
+            return list(log_part["entries"])
+        if isinstance(data.get("entries"), list):
+            return list(data["entries"])
+    return []
+
+
+
+# --- plain text capture support -------------------------------------------
+# Events the *client* sends.  Everything else on a ``42`` frame is something
+# the server sent us; that is only used when the dump has no direction marker.
+# For a bare frame without any direction marker, only the events *only* the
+# client emits decide the direction: the server emits `typing`/`chatMessage`
+# too, so those stay "received" by default.
+CLIENT_EVENTS = {"presenceSync", "sendMessage", "send_message", "syncPresence",
+                 "skipMatch", "skip", "leave"}
+
+_SEND_HINTS = ("send", "sent", "out", "up", "client", "c→s", "c->s", "request")
+_RECV_HINTS = ("recv", "received", "receive", "in", "down", "server", "s→c",
+               "s->c", "response", "message")
+_SEND_MARKERS = ("↑", "→", "->", "=>")
+_RECV_MARKERS = ("↓", "←", "<-", "<=")
+# Longest first, so "received" wins over "recv" and "->" over "-".
+_ALL_MARKERS = (_SEND_MARKERS + _RECV_MARKERS
+                + tuple(sorted(_SEND_HINTS + _RECV_HINTS, key=len, reverse=True)))
+
+# A frame starts with 1-2 frame digits (0, 2, 3, 40, 41, 42, 45) followed by
+# either the JSON payload or another digit: ``42[…]``, ``0{…}``, ``40{…}``.
+_FRAME_START_RE = re.compile(r"([0-9]{1,2}(?:\[|\{|[0-9]))")
+
+
+def _direction_of(line: str) -> str:
+    """``"send"``/``"recv"``/``""`` for one dump line (``""`` = unknown)."""
+    stripped = line.strip()
+    if stripped.startswith("{"):
+        # Chrome's WS pane copies frames as {"type": "send", "data": "42[…]"}.
+        obj = None
+        try:
+            obj = json.loads(stripped)
+        except Exception:
+            obj = None
+        if isinstance(obj, dict):
+            hint = str(obj.get("type") or obj.get("direction") or obj.get("source")
+                       or "").strip().lower()
+            if hint in _SEND_HINTS:
+                return "send"
+            if hint in _RECV_HINTS:
+                return "recv"
+    low = stripped.lower()
+    for marker in _ALL_MARKERS:                 # explicit arrows/words first
+        if low.startswith(marker):
+            return "send" if marker in _SEND_MARKERS + _SEND_HINTS else "recv"
+    return ""
+
+
+def _frame_payload(line: str) -> str:
+    """The frame text inside one dump line (markers and JSON wrappers removed)."""
+    stripped = line.strip()
+    for _ in range(2):                          # marker → maybe JSON → frame
+        if stripped.startswith("{"):
+            obj = None
+            try:
+                obj = json.loads(stripped)
+            except Exception:
+                obj = None
+            if isinstance(obj, dict) and obj.get("data") is not None:
+                stripped = str(obj.get("data")).strip()
+                continue
+        low = stripped.lower()
+        for marker in _ALL_MARKERS:
+            if low.startswith(marker):
+                stripped = stripped[len(marker):].strip()
+                break
+        else:
+            break
+    match = _FRAME_START_RE.search(stripped)
+    if match:
+        # The frame may contain spaces ({"content": "Hey, m"}), so keep the whole
+        # rest of the line — only trailing commas/quotes from a wrapper go away.
+        return stripped[match.start():].strip().rstrip('",')
+    return stripped
+
+
+def _guess_direction(frame: str) -> str:
+    """Fallback when a dump line carries no direction marker."""
+    text = frame.strip()
+    if text.startswith("0") or text.startswith("40") or text.startswith("41") \
+            or text.startswith("45") or text == "2":
+        return "recv"                       # open/hello, connect, disconnect, ping
+    if text == "3" or text.startswith("1") or text.startswith("43"):
+        return "send"                       # pong, close, ack
+    if text.startswith("42"):
+        try:
+            parsed = json.loads(text[2:])
+        except Exception:
+            return ""
+        if isinstance(parsed, list) and parsed and str(parsed[0]) in CLIENT_EVENTS:
+            return "send"
+        return "recv"
+    return ""
+
+
+def raw_frames(path: str) -> Tuple[List[str], List[str]]:
+    """``(receive, send)`` frames out of a plain text dump (``ws.txt``)."""
+    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    receive: List[str] = []
+    send: List[str] = []
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        frame = _frame_payload(line)
+        if not frame:
+            continue
+        direction = _direction_of(line) or _guess_direction(frame)
+        if direction == "send":
+            send.append(frame)
+        elif direction == "recv":
+            receive.append(frame)
+    return receive, send
+
+
+def har_frames(path: str) -> Tuple[List[str], List[str]]:
+    """``(receive, send)`` frames out of a capture, in capture order.
+
+    Accepts a HAR export *or* a plain text ``ws.txt`` dump — whatever the user
+    saved from DevTools.  A dump is detected by the file not being JSON (or by
+    the HAR carrying no frames at all).
+    """
+    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    receive: List[str] = []
+    send: List[str] = []
+    entries: List[Dict[str, Any]] = []
+    try:
+        entries = har_entries(json.loads(text))
+    except Exception:
+        entries = []
+    for entry in entries:
+        for frame in entry.get("_webSocketMessages", []) or []:
+            data_text = str(frame.get("data") or "")
+            if frame.get("type") == "send":
+                send.append(data_text)
+            else:
+                receive.append(data_text)
+    if receive or send:
+        return receive, send
+    return raw_frames(path)
+
+
+def replay_report(path: str, username: str = "", log_fn=None) -> int:
+    """Replay a capture offline and report what the bot's socket layer sees.
+
+    This is the answer to "does the bot detect the SMS in *this* recording?" —
+    no browser, no network, just the captured server frames through the exact
+    parsing the live bot uses.
+    """
+    log_fn = log_fn or log
+    from core.chat_ws import ChatWebSocket
+    receive, send = har_frames(path)
+    incoming: List[str] = []
+    matches: List[Dict[str, Any]] = []
+
+    chat = ChatWebSocket(cookie_header="", url="", my_username=username,
+                         log=log_fn,
+                         on_message=lambda text, _msg: incoming.append(text),
+                         on_match=lambda match: matches.append(match))
+    chat.deliver_inline = True           # offline: no socket, no worker thread
+    for frame in receive:
+        chat.feed(frame)
+    events = dict(chat.client.event_counts)
+
+    log_fn("=" * 72)
+    log_fn(f"replay report — {path}")
+    log_fn("=" * 72)
+    log_fn(f"frames in the capture: {len(receive)} received · {len(send)} sent")
+    log_fn(f"conversation: {chat.conversation_id or '<none>'}")
+    log_fn(f"participants: {chat.stats().get('participants')}")
+    log_fn(f"identity: username={chat.my_username or '<unknown>'} "
+           f"profile_id={chat.my_id or '<unknown>'} "
+           f"(socket pid={chat.client.pid or '<none>'} — a session id, not a profile)")
+    log_fn(f"events seen: {json.dumps(events, ensure_ascii=False)}")
+    log_fn(f"messages: {len(chat.messages)} total · {chat.messages_in} incoming · "
+           f"{chat.messages_out} ours")
+    log_fn(f"incoming SMS the bot would answer: {json.dumps(incoming, ensure_ascii=False)}")
+    if chat.closed_by_peer:
+        log_fn("the chat was closed over the socket (closure frame handled)")
+    if matches:
+        log_fn(f"matchUpdate frames: {len(matches)}")
+    ok = bool(incoming)
+    if not ok and chat.messages:
+        log_fn("✗ every message in this capture looked like our own — pass "
+               "--username with the account's name (or run --identity once)")
+    elif not incoming:
+        log_fn("✗ no chatMessage frame in this capture (nothing to detect)")
+    else:
+        log_fn(f"✓ {len(incoming)} incoming message(s) detected, "
+               f"{chat.messages_out} own message(s) separated — the socket layer "
+               "understands this capture")
+    return 0 if ok else 1
+
+
 def har_report(path: str) -> int:
     data = json.loads(Path(path).read_text(encoding="utf-8", errors="replace"))
     sends: List[str] = []
     recvs: List[str] = []
     urls: List[str] = []
-    for entry in data.get("entries", []) or []:
+    for entry in har_entries(data):
         request = entry.get("request") or {}
         if str(request.get("url") or "").startswith(("ws://", "wss://")):
             urls.append(request["url"])
@@ -207,6 +415,15 @@ def run_live(args) -> int:
         log(f"[WS] ✗ could not connect within {args.wait:.0f}s: {chat.client.last_error}")
         return 1
 
+    if args.identity and not chat.my_username:
+        log("[WS] reading the account's own username from the app (one-time login "
+            "check, headless) …")
+        username = identity_via_browser(account, log)
+        if username:
+            chat.my_username = username
+            save_ws_config(username=username)
+            log(f"[WS] identity: username={username!r}")
+
     if args.probe:
         probed = probe_in_browser(account, log)
         if probed:
@@ -237,7 +454,8 @@ def run_live(args) -> int:
     stats = chat.stats()
     log("[WS] summary: " + json.dumps(
         {k: stats.get(k) for k in ("connected", "events", "messages_in", "messages_out",
-                                   "confirmed_event", "conversation", "participants")},
+                                   "confirmed_event", "conversation", "participants",
+                                   "my_username", "my_id")},
         ensure_ascii=False))
     chat.stop()
     return 0
@@ -266,6 +484,52 @@ def start_reply_bot(chat: ChatWebSocket, stop: threading.Event) -> None:
             save_ws_config(send_event=chat.sent_event)
 
     chat.on_message = answer
+
+
+def read_username_from_page(page, log_fn=log) -> str:
+    """The account's own username, read from the open app page."""
+    try:
+        from browser import chat_reader
+        _messages, diag = chat_reader.extract_with_diag(page)
+        return str((diag or {}).get("myUsername") or "").strip()
+    except Exception as error:
+        log_fn(f"[WS] could not read the username from the page: {error}")
+        return ""
+
+
+def identity_via_browser(account: Dict[str, Any], log_fn) -> str:
+    """Open the saved session (headless) and read who this account is."""
+    from test_session_health import _load_automation_module
+    automation_module, how = _load_automation_module()
+    if automation_module is None:
+        log_fn(f"[WS] browser lookup unavailable: {how}")
+        return ""
+    automation = automation_module.ChitchatAutomation(
+        account=account, account_mode="restore", headless=True, thread_id=1)
+    automation.set_log_callback(lambda m: None)
+    try:
+        automation.is_running = True
+        browser = automation._launch_camoufox()
+        context = getattr(browser, "_context", None) or (browser.contexts or [None])[0]
+        if context is None:
+            return ""
+        from browser.browser_engine import apply_chromium_stealth
+        _kwargs, fingerprint = automation._identity_context_options()
+        apply_chromium_stealth(context, log_fn=None, fingerprint=fingerprint or None)
+        page = context.new_page()
+        if not automation.restore_saved_account_session(page):
+            log_fn("[WS] could not restore the session for the lookup")
+            return ""
+        return read_username_from_page(page, log_fn)
+    except Exception as error:
+        log_fn(f"[WS] identity lookup failed: {type(error).__name__}: {error}")
+        return ""
+    finally:
+        try:
+            automation.is_running = False
+            automation._close_camoufox()
+        except Exception:
+            pass
 
 
 def probe_in_browser(account: Dict[str, Any], log_fn) -> List[str]:
@@ -328,6 +592,12 @@ def main() -> int:
     parser.add_argument("--minutes", type=float, default=0.0, help="stop after N minutes")
     parser.add_argument("--wait", type=float, default=25.0, help="connect timeout (s)")
     parser.add_argument("--har", default="", help="print a protocol report for a HAR export")
+    parser.add_argument("--replay", default="",
+                        help="replay a capture offline (HAR or ws.txt dump): "
+                             "what would the bot see in it?")
+    parser.add_argument("--identity", action="store_true",
+                        help="read the account's own username from the app (browser, "
+                             "one-time; remembered in data/ws_config.json)")
     parser.add_argument("--bundle", default="", help="rank emit names in a saved JS bundle")
     args = parser.parse_args()
 
@@ -341,6 +611,9 @@ def main() -> int:
         return 0
     if args.har:
         return har_report(args.har)
+    if args.replay:
+        return replay_report(args.replay,
+                             username=args.username or str(ws_config().get("username") or ""))
     if args.bundle:
         return bundle_report(args.bundle)
     return run_live(args)

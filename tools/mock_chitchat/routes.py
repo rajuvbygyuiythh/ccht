@@ -30,12 +30,17 @@ def install(context: Any,
             debug: bool = False,
             ws_url: str = "",
             transport: str = "dom",
+            blind_others: bool = False,
             log: Callable[[str], None] = print) -> Any:
     """Serve every document request for the mock host from :mod:`site`.
 
     Returns the handler so callers can count calls or remove the route.
     ``?as=Name`` in the URL overrides the page identity (used by the
     "stranger" browser so it renders itself as a different user).
+
+    ``blind_others`` hides every other participant's message from *this*
+    context's ``/api/messages`` (the page never renders them).  The WS-only test
+    uses it so a reply can only have been triggered by a socket event.
     """
     stats = {"calls": 0, "cookies": 0}
 
@@ -68,6 +73,10 @@ def install(context: Any,
         if parsed.path == "/api/messages":
             since = int((query.get("since") or ["0"])[0] or 0)
             messages, next_index = backend.since(since)
+            if blind_others:
+                # Deliberate handicap for the WS-only test: somebody else's words
+                # are never handed to this page, so the bot cannot read them.
+                messages = [m for m in messages if str(m.get("author")) == who]
             _trace(who, f"GET /api/messages since={since} → {len(messages)} new")
             payload = {"messages": messages, "next": next_index}
             if backend.take_dump_request(who):

@@ -601,6 +601,11 @@ def main() -> int:
                              "ws = the conversation runs over the chat WebSocket")
     parser.add_argument("--ws-send-event", default="",
                         help="override the emit name used to send a chat message")
+    parser.add_argument("--bot-page-blind", action="store_true",
+                        help="with --transport ws: serve the bot's own page a "
+                             "blind DOM (the user's messages are never rendered "
+                             "there), so a passing run proves the SMS was "
+                             "detected from socket events alone")
     args = parser.parse_args()
     ws_mode = args.transport == "ws"
 
@@ -672,9 +677,13 @@ def main() -> int:
             for cookie in load_session_cookies(str(account.get("storage_state_path") or "")):
                 if cookie.get("name"):
                     ws_saved_cookie_names.add(str(cookie["name"]))
+                if cookie.get("value") and len(str(cookie["value"])) >= 6:
+                    # The real socket is authenticated by the cookie jar, not by
+                    # a single specially-named cookie, so every saved cookie
+                    # value maps to this account on the stand-in.
+                    token_map[str(cookie["value"])] = str(account["_display_name"])
                 if str(cookie.get("name")) == "token" and cookie.get("value"):
                     session_token = str(cookie["value"])
-                    token_map[session_token] = str(account["_display_name"])
         except Exception as error:
             log(f"[MockWS] could not read the session cookies: {error}")
         ws_server = ChitchatSocketServer(log=log, ping_interval=25.0,
@@ -760,12 +769,19 @@ def main() -> int:
                 except Exception:
                     context = None
             if context is not None:
-                if ws_mode:
+                if ws_mode and not args.bot_page_blind:
                     ws_prepare_context(context, bot_name, log)
                 routes.install(
                     context, backend, me=bot_name, api_base="", log=log,
                     debug=args.debug, ws_url=ws_page_url,
-                    transport=args.transport, on_page=bot_page_loaded)
+                    transport=("dom" if (args.bot_page_blind and ws_mode)
+                               else args.transport), on_page=bot_page_loaded,
+                    blind_others=bool(args.bot_page_blind and ws_mode))
+                if args.bot_page_blind and ws_mode:
+                    log("[MockSite] BLIND bot page: no page-side socket and the "
+                        "user's messages are never served to this context — the "
+                        "account's only socket is the backend client, and only "
+                        "the socket can report the user's words")
                 log("[MockSite] ✓ route hook installed on the account's browser context")
                 # Watch every page this account opens (console/errors/network).
                 # Listeners fire on the automation's own thread, so this is safe.
@@ -979,6 +995,24 @@ def main() -> int:
                       str(m.get("content") or ""))
                      for m in ((ws_server.messages if ws_server is not None else []))]
     ws_server_frames = list((ws_server.sent_to_client if ws_server is not None else []))
+
+    # -- WS-only proof: did the user's text ever exist in the bot's DOM? ------
+    blind_proof = {"enabled": bool(args.bot_page_blind and ws_mode),
+                   "stranger_texts": [], "leaked_into_bot_dom": []}
+    if ws_mode:
+        blind_proof["stranger_texts"] = [text for author, text in ws_transcript
+                                         if author == site.STRANGER_NAME and text]
+    if blind_proof["enabled"]:
+        bot_dom_blobs = [json.dumps(entry, ensure_ascii=False) for entry in
+                         list(getattr(backend, "states", []))
+                         if str(entry.get("where")) == bot_name]
+        bot_dom_blobs.append(str(getattr(backend, "dumped_html", {}).get(bot_name) or ""))
+        for text in blind_proof["stranger_texts"]:
+            if any(text in blob for blob in bot_dom_blobs):
+                blind_proof["leaked_into_bot_dom"].append(text)
+        log("[MockSite] WS-only proof — the user's words in the bot's page DOM: "
+            + (json.dumps(blind_proof["leaked_into_bot_dom"], ensure_ascii=False)
+               if blind_proof["leaked_into_bot_dom"] else "none (detection had to be socket-only)"))
     if ws_mode:
         log("[MockWS] accounts seen by the socket stand-in: "
             + (", ".join(ws_participants) or "<none>"))
@@ -1007,8 +1041,8 @@ def main() -> int:
             "engine.io + socket.io handshake completed": has("[WS] socket.io connected"),
             "the restored session cookies went out on the socket handshake":
                 bool(ws_cookie_hits),
-            "the account identity came from its own session (pid match)":
-                has("[WS] matchUpdate") or bot_name in ws_participants,
+            "the account identity came from its own session (cookie auth)":
+                has("[WS] matchUpdate") and bot_name in ws_participants,
             "incoming SMS was read from chatMessage events":
                 ws_events.get("chatMessage", 0) >= 2 and has("[WS] incoming SMS from"),
             "the reply was confirmed by the server echo":
@@ -1017,6 +1051,14 @@ def main() -> int:
             "the chat closure travelled over the socket":
                 has("[WS] the chat was closed") or has("[WS] matchUpdate"),
         })
+        if blind_proof["enabled"]:
+            checks.update({
+                "the bot's page DOM never carried the user's message": (
+                    bool(blind_proof["stranger_texts"])
+                    and not blind_proof["leaked_into_bot_dom"]),
+                "the SMS was detected from socket events only":
+                    has("[WS] incoming SMS from") and not blind_proof["leaked_into_bot_dom"],
+            })
     passed = all(checks.values())
 
     log("")
@@ -1038,6 +1080,9 @@ def main() -> int:
             f"{json.dumps(ws_events, ensure_ascii=False)}")
         log(f"  socket transcript: {json.dumps(ws_transcript, ensure_ascii=False)}")
         log(f"  socket clients seen: {ws_participants}")
+        if blind_proof["enabled"]:
+            log(f"  WS-only proof: route-blind bot page · user texts seen in the "
+                f"bot's DOM: {blind_proof['leaked_into_bot_dom'] or 'none'}")
 
     results = {
         "log": str(log.path),
@@ -1056,6 +1101,7 @@ def main() -> int:
             "ws_transcript": ws_transcript,
             "ws_clients": ws_participants,
             "ws_confirmed_event": (summary.get("ws") or {}).get("confirmed_event"),
+            "ws_only_proof": blind_proof,
         })
     if not passed:
         log("")

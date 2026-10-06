@@ -227,8 +227,6 @@ def test_chat_ws_flow():
     check("both participants are known",
           sorted(chat.stats()["participants"]) == ["Stranger42", "sadia.6.7"],
           str(chat.stats()["participants"]))
-    check("the account is identified from its own socket id (pid)",
-          chat.my_username == "sadia.6.7", chat.my_username)
 
     user.emit("sendMessage", {"conversationId": server.conversation_id,
                              "content": "hey, are you real?"})
@@ -239,6 +237,13 @@ def test_chat_ws_flow():
           incoming == ["hey, are you real?"], str(incoming))
     check("it is counted as incoming", chat.messages_in == 1, str(chat.messages_in))
 
+    def wait_for(predicate, timeout=4.0):
+        """Wait for something that happens on another thread (the sockets)."""
+        deadline = time.time() + timeout
+        while time.time() < deadline and not predicate():
+            time.sleep(0.05)
+        return bool(predicate())
+
     ok, how = chat.send_message("hey there")
     check("the reply is confirmed by the server echo", ok and "chatMessage" in how, how)
     check("the confirmed event is remembered", chat.sent_event == "chatMessage")
@@ -248,8 +253,29 @@ def test_chat_ws_flow():
           any("hey there" in frame for frame in chat.client.sent_frames),
           str(chat.client.sent_frames[-2:]))
     check("the user received the reply",
-          any(pl.get("message", {}).get("content") == "hey there"
-              for ev, pl in user_events if ev == "chatMessage"))
+          wait_for(lambda: any(pl.get("message", {}).get("content") == "hey there"
+                               for ev, pl in user_events if ev == "chatMessage")))
+    echoed = next((pl.get("message") for ev, pl in user_events
+                   if ev == "chatMessage"
+                   and pl.get("message", {}).get("content") == "hey there"), {})
+    check("our outgoing payload carried a nonce (the site's own field)",
+          bool(echoed.get("nonce")) and str(echoed["nonce"]) in chat.nonces,
+          f"{echoed.get('nonce')} / {chat.nonces[:2]}")
+    check("a message from the other side is never counted as ours",
+          chat.messages_in == 1 and chat.messages_out == 1,
+          f"in={chat.messages_in} out={chat.messages_out}")
+    # The capture proves ``pid`` is a *session* id, not a profile id, so the
+    # account is identified from its own echo instead (and by the page in a real
+    # run, see tools/session_chat.py).
+    wait_for(lambda: bool(chat.my_id))
+    check("our own profile id is learned from the echo",
+          bool(chat.my_id) and chat.my_id == str((echoed.get("author") or {}).get("id")),
+          f"my_id={chat.my_id!r} echoed={str((echoed.get('author') or {}).get('id'))!r}")
+    check("our own username is learned from the echo",
+          chat.my_username == "sadia.6.7", chat.my_username)
+    check("the socket pid is not treated as a profile id",
+          bool(chat.client.pid) and chat.client.pid != chat.my_id,
+          f"pid={chat.client.pid!r} profile={chat.my_id!r}")
 
     handler_calls = []
     chat.on_message = lambda text, raw: handler_calls.append(text)
@@ -265,6 +291,128 @@ def test_chat_ws_flow():
     chat.stop()
     user.close()
     server.stop()
+
+
+def test_dom_fallback_echo_is_not_incoming():
+    print("\n[dom fallback echo]")
+    server, url, _log = start_server()
+    chat = ChatWebSocket(url=url, cookie_header="token=REALTOKEN", log=Quiet(),
+                         my_username="sadia.6.7", echo_timeout=1.0,
+                         on_message=lambda text, _raw: None)
+    chat.start()
+    check("it connects", chat.wait_connected(5.0))
+    time.sleep(0.8)
+    # The DOM fallback types the reply into the page; that page's own socket sends
+    # it, and the echo comes back to us with a nonce we never generated.
+    chat.note_sent_text("sent by the page")
+    server._broadcast("chatMessage", {"message": {
+        "id": "msg-dom-1", "conversationId": server.conversation_id,
+        "author": {"id": "someone-else", "username": "some_other_user"},
+        "content": "sent by the page", "type": "TEXT", "status": "SENT",
+        "nonce": "page-generated-nonce", "flags": 0, "reactions": []}})
+    time.sleep(0.6)
+    check("the echo of a DOM-fallback reply is not counted as incoming",
+          chat.messages_in == 0, f"in={chat.messages_in} out={chat.messages_out}")
+    check("it is counted as our own message", chat.messages_out == 1,
+          str(chat.messages_out))
+    chat.stop()
+    server.stop()
+
+
+def test_har_dump_replay():
+    """A *plain text* dump (``ws.txt``) must replay exactly like the HAR."""
+    print("\n[har replay — a plain text ws.txt dump]")
+    import ws_chat
+
+    dump = REPO / "test_fixtures" / "chitchat_ws_dump.txt"
+    capture = REPO / "test_fixtures" / "chitchat_ws_capture.json"
+    receive, send = ws_chat.raw_frames(str(dump))
+    har_receive, har_send = ws_chat.har_frames(str(capture))
+    check("the dump is split like the HAR", (len(receive), len(send))
+          == (len(har_receive), len(har_send)),
+          f"dump={len(receive)}/{len(send)} har={len(har_receive)}/{len(har_send)}")
+    check("the dumped frames are the captured ones", receive == har_receive
+          and send == har_send)
+    check("no frame was lost to the dump format",
+          len(receive) == 20 and len(send) == 7)
+    check("har_frames() reads the dump too", ws_chat.har_frames(str(dump))
+          == (har_receive, har_send))
+
+    lines = []
+    code = ws_chat.replay_report(str(dump), username="test_user",
+                                 log_fn=lines.append)
+    report = "\n".join(lines)
+    check("replaying the dump passes", code == 0, report[-300:])
+    check("the dump replay found the incoming SMS",
+          "how old are you?" in report and "Hey, m" in report)
+    check("the dump replay knows the conversation",
+          "CONVERSATION_0000000001" in report)
+    check("the dump replay sees 2 incoming / 5 ours",
+          "2 incoming" in report and "5 ours" in report, report[-260:])
+    # Without a username the account is still recognised from the texts we sent
+    # (the same fallback the live bot uses before --identity has been run).
+    lines = []
+    code = ws_chat.replay_report(str(dump), log_fn=lines.append)
+    report = "\n".join(lines)
+    check("the dump replay works without a username too", code == 0,
+          report[-260:])
+    check("the identity came from the echoes", "2 incoming" in report
+          and "5 ours" in report, report[-260:])
+
+
+def test_har_replay():
+    print("\n[har replay — the real capture shape]")
+    sys.path.insert(0, str(REPO / "tools"))
+    import ws_chat
+
+    fixture = REPO / "test_fixtures" / "chitchat_ws_capture.json"
+    check("the captured frame fixture exists", fixture.is_file(), str(fixture))
+    receive, send = ws_chat.har_frames(str(fixture))
+    check("both directions of the capture are readable",
+          len(receive) == 20 and len(send) == 7, f"{len(receive)}/{len(send)}")
+
+    incoming = []
+    events = {}
+    log = Quiet()
+    chat = ChatWebSocket(my_username="test_user", log=log,
+                         on_message=lambda text, _msg: incoming.append(text))
+    chat.deliver_inline = True
+    for frame in receive:
+        chat.feed(frame)
+    events = dict(chat.client.event_counts)
+
+    check("the conversation is known",
+          chat.conversation_id == "CONVERSATION_0000000001", chat.conversation_id)
+    check("both participants are known",
+          chat.stats()["participants"] == ["stranger_user", "test_user"],
+          str(chat.stats()["participants"]))
+    check("only the stranger's messages are incoming",
+          incoming == ["Hey, m", "how old are you?"], str(incoming))
+    check("our own messages are separated (5 of them)",
+          chat.messages_out == 5 and chat.messages_in == 2,
+          f"in={chat.messages_in} out={chat.messages_out}")
+    check("the event counts match the capture",
+          events.get("chatMessage") == 7 and events.get("typing") == 2
+          and events.get("matchUpdate") == 2, str(events))
+    check("the closure frame is understood",
+          chat.closed_by_peer and log.has("the chat was closed"), "")
+    check("messageCount/lastMessage from the matchUpdate are logged",
+          log.has("messages=7") and log.has("last=MSG_0007"),
+          " | ".join(log.lines[-6:]))
+    check("the socket pid is reported as a session id, not a profile",
+          chat.client.pid == "PID_SESSION_0000001", chat.client.pid)
+    check("the tool's replay report passes",
+          ws_chat.replay_report(str(fixture), username="test_user",
+                                log_fn=lambda m: None) == 0)
+
+    # And without a username the nonce signal still separates our own messages.
+    blind = ChatWebSocket(log=Quiet(), on_message=lambda text, _msg: None)
+    blind.deliver_inline = True
+    for frame in receive:
+        blind.feed(frame)
+    check("even without a username the split is right (nonce signal)",
+          blind.messages_in == 2 and blind.messages_out == 5,
+          f"in={blind.messages_in} out={blind.messages_out}")
 
 
 def test_probe_finds_the_event():
@@ -344,6 +492,9 @@ if __name__ == "__main__":
     test_socket_client()
     test_engine_ping_pong()
     test_chat_ws_flow()
+    test_dom_fallback_echo_is_not_incoming()
+    test_har_replay()
+    test_har_dump_replay()
     test_probe_finds_the_event()
     test_har_report()
     print("\n" + "=" * 72)

@@ -237,6 +237,11 @@ class ChitchatSocketServer:
         self.conversation_id = "mock-" + _nanoid(10)
         self.messages: List[Dict[str, Any]] = []
         self.clients: List[Dict[str, Any]] = []
+        # Who is part of the current match.  The real site keeps the conversation
+        # participants visible in ``matchUpdate`` for as long as the match is
+        # open, even while one side is momentarily offline, so the stand-in keeps
+        # a roster next to the live connections.
+        self.roster: List[Dict[str, Any]] = []
         self._lock = threading.Lock()
         self._server: Optional[socket.socket] = None
         self._thread: Optional[threading.Thread] = None
@@ -308,8 +313,11 @@ class ChitchatSocketServer:
         username = params.get("as") or self.token_map.get(token) or ""
         if not username:
             username = f"{self.default_stranger}" if not token else f"user-{token[:6]}"
+        # The capture shows the socket ``pid`` and the *profile* id are different
+        # things (pid: 20-char nanoid, profile id: 24-char hex), so the stand-in
+        # keeps them apart too.
         return {"username": username, "token": token,
-                "id": _nanoid(16), "sid": _nanoid(20)}
+                "id": _nanoid(24), "pid": _nanoid(20), "sid": _nanoid(20)}
 
     def _broadcast(self, event: str, payload: Any) -> None:
         with self._lock:
@@ -337,25 +345,28 @@ class ChitchatSocketServer:
                 "attachments": [],
                 "createdAt": _now_iso(),
                 "status": "SENT",
-                "nonce": _nanoid(21),
                 "flags": 0,
                 "reactions": [],
             }
         }
         if extra:
-            message["message"].update(extra)
+            extra = dict(extra)
+            if extra.pop("_drop_flags", False):
+                message["message"].pop("flags", None)
+            message["message"].update({k: v for k, v in extra.items() if v})
         with self._lock:
             self.messages.append(message["message"])
         return message
 
     def match_payload(self, closed: bool = False, closed_by: str = "") -> Dict[str, Any]:
         with self._lock:
+            people = list(self.roster) or list(self.clients)
             participants = [{"profile": {"id": c["id"], "username": c["username"],
                                          "avatar": c["id"], "badges": [],
                                          "createdAt": _now_iso(),
                                          "preferences": {"allowFriendRequests": True}},
                              "userId": c["id"]}
-                            for c in self.clients]
+                            for c in people]
         conversation = {
             "id": self.conversation_id,
             "participants": participants,
@@ -367,7 +378,13 @@ class ChitchatSocketServer:
         if closed:
             conversation["closure"] = {"closed": True, "closeReason": "INTENTIONAL",
                                         "closedAt": _now_iso(), "closedBy": closed_by}
+        with self._lock:
+            conversation["messageCount"] = len(self.messages)
+            if self.messages:
+                conversation["lastMessage"] = self.messages[-1].get("id")
         return {"match": {"conversation": conversation,
+                          "messageCount": conversation["messageCount"],
+                          "lastMessage": conversation.get("lastMessage"),
                           "users": [{"userId": p["userId"], "inactive": False}
                                     for p in participants],
                           "closure": conversation.get("closure", {"closed": False}),
@@ -390,6 +407,10 @@ class ChitchatSocketServer:
                   "user_agent": headers.get("user-agent", "")}
         with self._lock:
             self.clients.append(client)
+            # Registering the connection joins the match (a reconnect after a
+            # closure is a fresh match, hence the roster reset on closure below).
+            self.roster = [c for c in self.roster
+                           if c["username"] != client["username"]] + [client]
         self.log(f"[MockWS] {who['username']} connected "
                  f"(cookies={len([c for c in headers.get('cookie', '').split(';') if c.strip()])})")
 
@@ -415,7 +436,7 @@ class ChitchatSocketServer:
                     break
                 text = payload.decode("utf-8", "replace")
                 if text.startswith("40"):
-                    ws.send_text("40" + json.dumps({"sid": who["sid"], "pid": who["id"]},
+                    ws.send_text("40" + json.dumps({"sid": who["sid"], "pid": who["pid"]},
                                                    separators=(",", ":")))
                     self.log(f"[MockWS] {who['username']} namespace connected "
                              f"(pid={who['id'][:8]}…)")
@@ -482,7 +503,14 @@ class ChitchatSocketServer:
                 logger(f"[MockWS] {client['username']} sent {event} without a text payload "
                        f"— ignored")
                 return
-            message = self._chat_message(client, text)
+            extra = {}
+            if isinstance(data, dict):
+                for field in ("nonce", "type", "status"):
+                    if data.get(field):
+                        extra[field] = data[field]
+            if extra.get("nonce"):
+                extra["_drop_flags"] = True
+            message = self._chat_message(client, text, extra=extra or None)
             # The real server echoes the message back to *everyone*, sender included.
             self._broadcast("chatMessage", message)
             return
@@ -490,6 +518,11 @@ class ChitchatSocketServer:
         if event in ("skip", "endChat", "leave"):
             self._broadcast("matchUpdate", self.match_payload(closed=True,
                                                               closed_by=client["id"]))
+            with self._lock:
+                # The match is over: whoever is still connected starts fresh (a
+                # new conversation id, like the real site hands out per match).
+                self.roster = list(self.clients)
+                self.conversation_id = "mock-" + _nanoid(10)
             return
 
 
