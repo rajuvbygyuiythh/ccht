@@ -1,0 +1,741 @@
+================================================================================
+EVA CHATBOT — COMPLETE SYSTEM ARCHITECTURE
+Chitchat.gg Automated Chatting Bot
+TABLE OF CONTENTS
+-----------------
+1. System Overview & Vision
+2. High-Level Architecture Diagram
+3. Module Dependency Map
+4. Core Subsystems (Detailed)
+4.1 Sign-In & Authentication Layer
+4.2 Browser Engine Layer
+4.3 Browser Automation Layer
+4.4 Chat Intelligence Layer (6-Flow Engine)
+4.5 Database & Reply Layer
+4.6 Thread Management Layer
+4.7 Resource Management Layer
+4.8 Context Pool Layer
+4.9 Engine Bridge Layer (Go + JS)
+4.10 GUI Dashboard Layer
+5. Data Flow (End-to-End)
+6. Configuration System
+7. Account & Session Management
+8. File Structure
+9. Startup Sequence
+10. Key Design Patterns
+EVA is an automated chatbot for Chitchat.gg (random video/text chat
+platform). It simulates a female user named "EVA" who chats with
+strangers and tries to redirect them to Snapchat.
+CORE PURPOSE:
+- Automatically chat with strangers on Chitchat.gg
+- Maintain human-like conversation using 6 unique flow types
+- Redirect conversations to Snapchat at the right moment
+- Scale to 1000+ concurrent browser sessions smoothly
+KEY DESIGN PRINCIPLES:
+- "One browser, many contexts" (2026 Golden Rule) — minimize RAM
+- Adaptive resource governor — never let PC freeze
+- Modular architecture — each layer is independently swappable
+- Backward compatible — every upgrade degrades gracefully
+- Anti-detect stealth — fingerprint spoofing, WebRTC leak blocking
+┌─────────────────────────────────────────────────────────────────────┐
+│                         USER INTERFACE LAYER                         │
+│                    main.py (PyQt6 GUI Dashboard)                     │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
+│  │Dashboard │ │ Accounts │ │ Messages │ │ Settings │ │  Logs    │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
+│                    ThreadManager (PyQt QObject)                     │
+└──────────────────────────┬──────────────────────────────────────────┘
+┌──────────────────────────▼──────────────────────────────────────────┐
+│                     ORCHESTRATION LAYER                              │
+│  ┌────────────────┐ ┌──────────────┐ ┌──────────────────────────┐  │
+│  │ ThreadManager  │ │ Resource     │ │  ConfigLoader            │  │
+│  │                │ │  Governor    │ │  (config.json)           │  │
+│  │ - workers      │ │              │ │                          │  │
+│  │ - keyword sel  │ │ - CPU/RAM    │ │ - chat_timing            │  │
+│  │ - proxy mgmt   │ │ - throttle   │ │ - human_behavior         │  │
+│  │ - ctx pool     │ │ - recycle    │ │ - performance            │  │
+│  │ - go engine    │ │ - redline    │ │ - ban_detection          │  │
+│  │ - context pool │ │ - Firefox GC │ │ - session_management     │  │
+│  └───────┬────────┘ └──────┬───────┘ └──────────┬───────────────┘  │
+│          │                 │                     │                   │
+│  ┌───────▼─────────────────▼─────────────────────▼───────────────┐  │
+│  │                    ENGINE BRIDGE LAYER                          │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────────────┐   │  │
+│  │  │ EngineBridge │  │ JsWorkerBridge│  │ AccountManager     │   │  │
+│  │  │ (Go binary)  │  │ (Node.js)    │  │ (session registry) │   │  │
+│  │  └──────┬───────┘  └──────┬───────┘  └────────┬───────────┘   │  │
+│  └─────────┼─────────────────┼────────────────────┼──────────────┘  │
+│            │                 │                    │                   │
+└────────────┼─────────────────┼────────────────────┼──────────────────┘
+│                 │                    │
+┌────────────▼─────────────────▼────────────────────▼──────────────────┐
+│                    AUTOMATION LAYER                                  │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │  browser_automation.py (ChitchatAutomation)                   │   │
+│  │  ┌──────────────────────────────────────────────────────┐    │   │
+│  │  │  browser_engine.py (Chromium/Camoufox abstraction)    │    │   │
+│  │  │  ┌────────────────────────────────────────────────┐  │    │   │
+│  │  │  │  context_pool.py (One browser, many contexts)  │  │    │   │
+│  │  │  └────────────────────────────────────────────────┘  │    │   │
+│  │  └──────────────────────────────────────────────────────┘    │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+└───────────────────────────┬──────────────────────────────────────────┘
+┌───────────────────────────▼──────────────────────────────────────────┐
+│                    CHAT INTELLIGENCE LAYER                            │
+│  │  chat/rules.py (RuleEngine — 6 flows + 6 steps)              │   │
+│  │  ┌─────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐  │   │
+│  │  │common_scan│ │geo_handler│ │content │ │ style_analyzer   │  │   │
+│  │  │(regex)  │ │(country) │ │_filter │ │ (style mirror)   │  │   │
+│  │  └─────────┘ └──────────┘ └──────────┘ └──────────────────┘  │   │
+│  │  ┌──────────┐ ┌──────────────┐ ┌──────────────────────────┐  │   │
+│  │  │chat_db.py│ │horny_flirty │ │ database/loader.py       │  │   │
+│  │  │(13 DBs) │ │_db.py       │ │ (pipe DB + evoflow)      │  │   │
+│  │  └──────────┘ └──────────────┘ └──────────────────────────┘  │   │
+│  │  ┌──────────┐                                                │   │
+│  │  │rule_bot │ (ChatRuleBot orchestrator)                      │   │
+│  │  └──────────┘                                                │   │
+│                    PERSISTENCE LAYER                                  │
+│  │  account_session_store.py (cookies, storage_state,            │   │
+│  │  fingerprint, history, metadata per account)                  │   │
+│  │  │  account_sessions/ (per-account subfolders)           │    │   │
+│  │  │    ├── metadata.json                                  │    │   │
+│  │  │    ├── storage_state.json                             │    │   │
+│  │  │    ├── fingerprint.json                               │    │   │
+│  │  │    ├── history.json                                   │    │   │
+│  │  │    └── .banned (flag file)                            │    │   │
+└──────────────────────────────────────────────────────────────────────┘
+```
+DEPENDENCY DIRECTIONS (arrow = depends on):
+main.py
+├── browser/account_session_store.py
+├── entry/thread_manager.py
+├── core/config_loader.py
+└── browser/browser_automation.py
+├── chat (RuleBot)
+│     ├── common_scan.py
+│     ├── content_filter.py
+│     ├── geo_handler.py
+│     ├── chat_db.py
+│     ├── horny_flirty_db.py
+│     ├── style_analyzer.py
+│     ├── rules.py
+│     └── database/loader.py
+├── browser/browser_engine.py
+│     └── (Playwright/Camoufox)
+├── core/resource_governor.py
+├── browser/context_pool.py
+├── core/engine_bridge.py
+├── browser/human_behavior.py
+└── core/signin_window.py
+└── browser/device_signin.py
+entry/thread_manager.py
+├── browser/browser_automation.py
+└── core/account_manager.py
+Files:
+- core/signin_window.py (PyQt6 GUI dialog)
+- browser/device_signin.py (Device authentication to emmarn.com API)
+Purpose:
+Authenticates the user's device before the bot can run.
+Uses a Cloudflare Worker API (app.emmarn.com) to register
+the device with a unique ID.
+Flow:
+1. DeviceSignin collects: hostname, OS, arch, CPU, MAC, UUID
+2. Sends device info to api_url with app_id
+3. Receives authentication token
+4. SigninWindow shows progress UI with QThread worker
+5. On success, main.py GUI is unlocked
+File: browser/browser_engine.py (~645 lines)
+Abstracts browser launching so the bot can switch between
+Chromium (recommended) and Camoufox (legacy anti-detect)
+WITHOUT touching any higher-level code.
+Key Classes/Functions:
+- launch_browser(engine, headless, proxy, log_fn, fingerprint) → (browser, handle)
+- close_browser(handle)
+- apply_chromium_stealth(context, fingerprint) — Anti-detect injection
+- chromium_context_kwargs(fingerprint) → kwargs dict
+- kill_orphan_browsers(engine) — Cleanup crashed processes
+- _build_stealth_init_script(ua, platform, hw, mem) — JS injection
+Anti-Detect Features (Chromium):
+- navigator.webdriver deletion
+- Custom User-Agent + platform + hardwareConcurrency + deviceMemory
+- Realistic PluginArray (not plain array)
+- navigator.languages override
+- Screen/viewport dimensions with realistic window chrome
+- window.chrome object definition
+- WebRTC IP leak prevention (patch RTCPeerConnection)
+- iframe consistency for navigator.webdriver
+- Random viewport, hardware concurrency, device memory per launch
+File: browser/browser_automation.py (~1200+ lines)
+The core automation engine. Manages the complete browser lifecycle:
+login → captcha → chat → snap redirect → repeat.
+Key Class: ChitchatAutomation
+Attributes:
+- account: dict with email/password (or created_session UUID)
+- fixed_message_templates: list of message files
+- headless: True/False
+- thread_id: for logging
+- chat_timeout: max replies per conversation
+- reply_delay_min/max: random delay between replies
+- human_behavior: loaded from config.json
+- ban_detection_cfg: ban signal detection
+- context_pool_slot: shared browser context (2026 upgrade)
+- engine_bridge: Go engine bridge for launch gating
+Key Methods:
+- _launch_camoufox(): Launches browser via browser_engine
+- _ensure_frozen_camoufox(): Installs browser for PyInstaller builds
+- _close_camoufox(): Clean shutdown via handle
+- _detect_ban(page): Checks for ban indicators
+- _handle_ban(page): Auto-close + delete session
+- _open_background_tabs(context): Schedules unique-site visits (persistent tabs removed)
+- _maybe_visit_unique_site(): Opens one random site from data/unique_sites.txt, reads/scrolls, returns
+- _apply_resource_blocking(context): Block images/fonts/media
+- _humanize_reaction_pause(): Random click delay
+- _humanize_read_reply(): Simulate reading before replying
+- _maybe_micro_idle(): Random scroll/tap while waiting
+- _get_chat_messages(): Select template + return messages
+- _process_message(message, snapchat_id): Render template
+- _save_successful_account_session(page): Persist session
+- get_ip_geolocation(): IP geolocation detection
+Site Visit System (replaces Background Tab System):
+- Opens ONE random site from data/unique_sites.txt between chats
+- File is hot-reloaded; site rotation avoids repeating the previous site
+- Reads/scrolls 3-6s (config periodic_visit_dwell_min/max_seconds), then closes the tab
+- Returns to the chitchat tab
+- chat/rules.py (1211 lines — THE CORE ENGINE)
+- chat/common_scan.py (329 lines — Regex classifier)
+- chat/geo_handler.py (173 lines — Country detection)
+- chat/content_filter.py (63 lines — Explicit content filter)
+- chat/style_analyzer.py (179 lines — Style mirroring)
+- chat/chat_db.py (231 lines — 13 database loader)
+- chat/horny_flirty_db.py (441 lines — Horny/flirty DB)
+- chat/database/loader.py (215 lines — Pipe + EvoFlow loader)
+- chat/rule_bot.py (65 lines — ChatRuleBot orchestrator)
+Generate human-like chat replies using a 6-step sequence with
+6 unique flow types. Each conversation randomly picks a flow.
+Each conversation randomly picks ONE flow (weighted random):
+Flow 1: FRIENDLY (30%)
+Step 0: Greeting → "hey" / "heyy" / "hi"
+Step 1: Gender+Age → "f [18-26]"
+Step 2: Country → "{country} wbu?"
+Step 3: Flow-specific → "oh nice {country}!" / "u single?"
+Step 4: Flow-specific → "oh nice! tell me more"
+Step 5: Flow-specific → "thats actually cool"
+Step 6: Snap hint → 👻👻 "we can chat 👻"
+Step 7: Snap gate → "snap : eva_chill"
+Flow 2: NIGHT (20%)
+Same structure, different step 3/4/5 text:
+Step 3: "{country} 🌙"
+Step 4: "u alone rn?" / "cant sleep?"
+Step 5: "haha maybe a little 😉"
+Snap hint: 🌙👻 "im more active at night 👻"
+Flow 3: DEEP (15%)
+Same structure, emotional text:
+Step 3: "oh {country} beautiful"
+Step 4: "u have any dreams?" / "whats ur biggest fear?"
+Step 5: "omg same! we match 💕"
+Snap hint: 💕👻 "i feel connected to u"
+Flow 4: FUN (15%)
+Same structure, playful/teasing text:
+Step 3: "{country}?? ur joking right 😂"
+Step 4: "whats ur most embarrassing story?"
+Step 5: "ngl ur fun to talk to"
+Snap hint: 😂👻 "ur too fun lets snap"
+Flow 5: DIRECT (10%)
+Same structure, quick/confident text:
+Step 3: "{country} cool"
+Step 4: "whats ur snap?" / "u here to chat?"
+Step 5: "ok ur cute"
+Snap hint: 👻 "snap me"
+Flow 6: ROMANCE (10%)
+Same structure, sweet/romantic text:
+Step 3: "{country} is romantic 🥰"
+Step 4: "whats ur idea of a perfect date?"
+Step 5: "ngl ur adorable"
+Snap hint: 💕👻 "i want to talk more"
+14 regex-based scanners check every user message:
+- GREETING_SCAN: hi, hey, hello, hru, etc.
+- AGE_SCAN: "how old", "ur age", etc.
+- NAME_SCAN: "whats ur name", etc.
+- LOCATION_SCAN: "where u from", etc.
+- SNAP_REQUEST_SCAN: snap, sc, add me, username, etc.
+- SEXTING_SCAN: nude, dick, sex, etc.
+- CONTENT_REQUEST_SCAN: onlyfans, sell content, etc.
+- SOCIAL_MEDIA_SCAN: instagram, whatsapp, etc.
+- HORNY_SCAN: horny, hot, sexy, alone, etc.
+- FLIRT_SCAN: like me, cute, beautiful, babe, etc.
+- OBJECTION_SCAN: scam, bot, waste time, etc.
+- THANK_SCAN: thank, thx, ty, etc.
+- CONFUSED_SCAN: what, idk, confused, etc.
+Returns: (primary_tag, all_tags_matched)
+Pattern: `^([mMfF])\s*(\d{1,2})?\b`
+Examples:
+"m"       → ("male", None)
+"M 21"    → ("male", 21)
+"f"       → ("female", None)
+"im 39"   → (None, 39) — age only
+"25"      → (None, 25) — standalone age
+CountryRotator class:
+- Picks one random country per session
+- If user shares country, bot MIRRORS it (builds rapport)
+- Never contradicts user's country
+- Supported: 40+ countries across 7 regions
+- Uses high-priority countries for snap redirect
+Filters explicit content from early-zone replies:
+- _EXPLICIT_PATTERNS regex: matches horny, nude, sex, etc.
+- _EXPLICIT_WORDS set: individual explicit words
+- is_explicit(reply) → True/False
+- filter_explicit(replies) → cleaned list
+- safe_choice(replies) → pick non-explicit or fallback
+StyleProfile class:
+- avg_word_count, emoji_density, slang_score
+- uses_periods, uses_exclamations
+- avg_message_length, slang_set
+mirror_reply(reply, style, user_message) → adjusted reply:
+- Replaces "you" → "u", "are" → "r", "your" → "ur"
+- Strips periods/exclamations based on user style
+- Trims word count to match user's typical message length
+- Copies emoji usage from user message
+3-level horny detection:
+- Level 1 (soft): alone, bored, horny, miss, etc.
+- Level 2 (medium): hot, sexy, beautiful, cute, etc.
+- Level 3 (strong): nudes, sex, dick, fuck, etc.
+4 flirty categories:
+- compliment, affection, date, tease
+Each level/category has dedicated short-reply lists.
+Horny deflection: deflect ONCE, then skip to snap hint.
+10 snap usernames from snap.txt, cycled round-robin:
+eva_chill, eva_21, eva_69, eva_xx, eva_love,
+eva_dark, eva_sweet, eva_hot, eva_real, eva_cool
+10 snap message formats:
+"my snp : {username}", "sc : {username}", "{username}", etc.
+Snap gate: 30% flow-specific intro, 70% random format + username.
+13 external .txt files from `C:\Users\papi\Desktop\ev b\local_db\`:
+01_greetings.txt, 02_identity_profile.txt, 03_smalltalk.txt,
+04_flirty_safe.txt, 04b_flirty_extra.txt, 05_links_objections.txt,
+06_normal_chat.txt, 07_engagement_hooks.txt, 08_curiosity_triggers.txt,
+09_multilang.txt, 60_adult_gate_safe.txt, 70_adult_consensual_curated.txt,
+10_million_pairs.txt (5000 randomly sampled)
+Format: "keyword ||| bot_reply" (pipe-separated)
+Key functions: match_keyword(), get_reply(), get_random_reply(),
+get_engagement_hook(), get_curiosity_trigger(), get_flirty_reply(),
+get_normal_reply(), get_any_reply(), stats()
+Loads from 2 source directories:
+- Source A (ev-bot/): 5 files (basic_replies, normal_goal_10k_db,
+adult_safe_extra_5k_db, adult_unique_varied_15k_db, adult_generated_db)
+- Source B (telegram bot/eva_bot_v7/): 4 files (basic_replies,
+learned_pairs, sexting_dataset, flirty_db)
+Also loads EvaFlow JSON rule files from `EvaFlow_STAGE_SEPARATE_DB_DIRECT_RUN_v2/data/replies/`
+and promote_extract.txt (personality spec).
+Functions: load_pipe_db(), load_evoflow_rules(), load_promote_extract()
+Contains the upgraded basic_replies list (71 keywords) historically
+saved to reply_database.json. The legacy conversation_engine.py that
+consumed it was removed in the 2026-09-08 cleanup; this section is
+kept as reference. The active path is `chat/rules.py` (RuleEngine +
+InputOutputEngine TXT matcher).
+4-layer priority DB router (legacy — `conversation_engine.py` removed):
+1. Basic DB (build_upgraded_db.py) — direct matches, 0.92 threshold
+2. Normal DB (chat_db.py) — general chat, 0.92 threshold
+3. Learned pairs (database/loader.py) — pipe DB, 0.90 threshold
+4. Flirty DB (horny_flirty_db.py) — flirty mode only, 0.92 threshold
+Every layer replaces `{username}` with `self.snap_username.lstrip("@")`.
+File: entry/thread_manager.py (~1200 lines)
+Manages multiple concurrent browser automation threads.
+Each thread runs an independent ChitchatAutomation instance.
+Key Class: ThreadManager (QObject)
+Core Features:
+- NonRepeatingRandomSelector: picks items without immediate repeat
+- Thread-safe keyword selection (threading.Lock)
+- Account rotation: round-robin, prevents reusing failed accounts
+- Proxy rotation: different proxies per thread
+- Staggered starts: 0.5-1.5s between browser launches
+- Performance presets: LOW (1-2), MEDIUM (3-5), HIGH (6-10) threads
+- Signal system: thread_started, thread_log, thread_status, etc.
+Runtime Modes:
+- Single-browser mode: exactly 1 worker/browser, no Go/ContextPool
+- Multi-browser mode: Go engine + per-worker browsers
+- Context-pool mode: one browser, many contexts (Golden Rule)
+Thread Lifecycle:
+start_threads(thread_count) → create workers → staggered starts
+→ each worker runs continuously
+_on_thread_finished() → release pool slot → restart with new account
+Signals (PyQt6):
+thread_started(int, str), thread_log(int, str), thread_status(int, str)
+proxy_warning(int, str), account_exhausted(str), thread_finished(int)
+all_threads_finished()
+File: core/resource_governor.py (~447 lines)
+Tiered RAM/CPU watchdog that keeps the PC responsive under heavy load.
+Driven by ThreadManager.tick() (~1s intervals), adds zero threads.
+Three Tiers:
+Tier 1 — THROTTLE (yellow): RAM >= mem_warn (0.65) or CPU >= cpu_warn (0.60)
+- Deny new browser launches via Go engine launch gate
+- Extend stagger between thread starts
+- Trigger Firefox memory-minimize
+Tier 2 — RECYCLE (orange): RAM >= mem_recycle (0.75)
+- Close oldest N contexts (ContextPool.recycle_oldest)
+- Signal Go engine to pause context creation
+- Run Firefox GC
+Tier 3 — REDLINE (red): RAM >= mem_redline (0.85) or free < min_free_mb (512MB)
+- Kill the single most expensive browser process
+- Block all new launches until pressure subsides
+- Cooldown: 10s between kills
+Firefox Memory Optimization (45 prefs):
+- disk/memory cache enabled but capped at 50MB each
+- session history kept tiny (4 entries)
+- image decoded buffer capped at 50MB
+- speculative loading disabled
+- animations off, telemetry off
+- media cache small but NOT zero (prevents blank pages)
+Callbacks wired by ThreadManager:
+- deny_launches_cb → Go engine launch gate
+- set_launch_max_cb → restore launch cap
+- recycle_contexts_cb → ContextPool.recycle_oldest
+- firefox_gc_cb → ContextPool.trigger_firefox_gc
+- kill_worst_browser_cb → find_and_kill_worst_browser_process
+File: browser/context_pool.py (~560 lines)
+The 2026 Golden Rule implementation: ONE browser, MANY isolated contexts.
+Instead of launching one Camoufox browser per thread (~200-300MB each),
+we launch ONE browser and create N isolated BrowserContext objects inside.
+Each context has its own cookies, storage, and fingerprint.
+Architecture:
+┌──────────────────────────────────────────┐
+│           ONE Camoufox Browser              │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐     │
+│  │Ctx #1│ │Ctx #2│ │Ctx #3│ │Ctx #N│     │
+│  │acc 1 │ │acc 2 │ │acc 3 │ │acc N │     │
+│  └──────┘ └──────┘ └──────┘ └──────┘     │
+└──────────────────────────────────────────┘
+Key Class: ContextPool
+- max_contexts: 50 (configurable, ~1GB per 50 contexts)
+- semaphore: threading.Semaphore(max_contexts) for bounding
+- _slots: Dict[int, ContextSlot] tracking all active contexts
+- _browser: the single shared Playwright Browser object
+- start(fingerprint, proxy): Launch shared browser
+- create_context(account_key, storage_state, fingerprint, proxy) → ContextSlot
+- close_context(slot_id): Close context + release semaphore
+- close_all(): Close every context + shut down browser
+- recycle_oldest(n): Close n oldest contexts to free RAM
+- trigger_firefox_gc(): Memory-minimize all live pages
+- get_live_pages(): Return all Playwright pages
+ContextSlot:
+- slot_id, account_key, context, page, created_at, closed, proxy
+- Tracks age for oldest-first recycling
+Singleton pattern: get_pool() + reset_pool()
+File: core/engine_bridge.py (~560 lines)
+Launches the compiled Go engine (chitchat-engine) as a subprocess.
+Communicates via line-delimited JSON on stdin/stdout.
+Provides: adaptive worker count, worker registration, heartbeats,
+hung worker detection, rate limiting, launch gating.
+Key Class: EngineBridge
+API:
+- start(): Launch Go subprocess + reader thread
+- set_config(max_workers, min_workers, cpu_threshold, etc.)
+- register_worker(worker_id), unregister_worker(worker_id)
+- heartbeat(worker_id): Keep worker alive in engine's watchdog
+- acquire(worker_id) → (ok, wait_ms): Rate limit token
+- launch_acquire(max_concurrent) → (ok, wait_ms): Launch gate
+- launch_release(): Free a launch gate slot
+- set_launch_max(max_concurrent): Set concurrent launch cap
+- reset_launch_gate(): Clear stale in-flight counters
+- mem_pressure(): Signal redline to engine
+- signal_recycle(): Pause context creation
+- launch_adapt(full_cap): Adaptive shrink/restore
+- recommended_workers() → int
+- resource_snapshot() → dict
+- pop_hung_workers() → list[int]
+- drain_logs(), drain_events()
+File: core/account_manager.py (~410 lines)
+Thread-safe registry of serial-numbered accounts.
+Supports 3 input formats: session folders, tokens.txt, cookies.txt.
+Key Class: AccountManager
+Account Entry (AccountEntry dataclass):
+- serial: 1-based number
+- account_key: stable unique id
+- email, account_type (session/token/cookie)
+- folder_path, storage_state_path, fingerprint_path
+- status: idle/active/resting/banned/exhausted/failed
+- last_used, chat_count, fail_count
+Features:
+- load(directory): Load all accounts from folder
+- next_idle_account(): Round-robin pick next idle account
+- mark_status(account_key, status): Update account status
+- summary(): Counts by status
+- format_summary(), format_list(): Display helpers
+- Thread-safe via threading.RLock()
+File: main.py (~1230+ lines) (root entry)
+PyQt6 GUI with 5 tabs for controlling the entire bot.
+Tabs:
+1. Dashboard: Stats cards (threads, CPU, RAM, runtime), quick controls,
+performance presets (LOW/MEDIUM/HIGH), START/STOP buttons, live log
+2. Accounts: Account file loading, proxy configuration, mode selection
+(Create/Login/Restore)
+3. Messages: SMS mode toggle, message templates folder, Snapchat IDs,
+first message mode (True/False/Random), delays
+4. Settings: Browser engine selection, chat timing, human behavior,
+resource governor settings, config.json management
+5. Logs: Log filtering, auto-scroll, export logs, per-thread log tabs
+Header: "EVA BOT" with READY status, build ID "EVA-DASHBOARD-V4"
+- start_bot(): Validate config, load accounts, create threads
+- stop_bot(): Stop all threads
+- _apply_preset(level): Quick config changes
+- browse_accounts_file(), browse_proxy_file(), etc.
+- load_login_accounts(), load_restore_accounts()
+- update_runtime(): Timer callback for stats
+1. USER clicks START in GUI
+├── main.py:start_bot() validates config, loads accounts
+├── thread_manager.py:start_threads(N) creates N workers
+│   ├── If N=1: single-browser mode (no Go/ContextPool)
+│   ├── If N>1 + restore mode: ContextPool mode
+│   └── If N>1 + login mode: per-worker browsers
+├── Each worker → ChitchatAutomation
+│   ├── browser_engine.py:launch_browser() → browser instance
+│   ├── context_pool.py or direct browser.new_context()
+│   │
+│   └── Chat loop:
+│       ├── browser_automation._get_chat_messages()
+│       │   └── chat_db.py / message templates
+│       │
+│       ├── ChitchatAutomation._process_message()
+│       │   └── Replace {username} with snap_id
+│       ├── ChitchatAutomation._humanize_read_reply()
+│       │   └── Wait 0.8-2.5s (configurable)
+│       └── Send message to chat page
+├── User responds
+├── ChitchatAutomation reads new message
+├── chat/rules.py:RuleEngine.decide_reply(user_msg, state)
+│   ├── common_scan.scan_message(msg) → tags
+│   ├── detect_gender_age(msg) → (gender, age)
+│   ├── Horny check: match_horny(msg)
+│   ├── Snap request check: SNAP_REQUEST_SCAN
+│   ├── 6-step sequence:
+│   │   Step 0: greeting
+│   │   Step 1: gender+age
+│   │   Step 2: country (geo_handler.CountryRotator)
+│   │   Step 3: Flow-specific (FLOWS[flow_type]["step3"])
+│   │   Step 4: Flow-specific (FLOWS[flow_type]["step4"])
+│   │   Step 5: Flow-specific (FLOWS[flow_type]["step5"])
+│   │   Step 6: Snap hint (emojis + text)
+│   │   Step 7: Snap gate (random format + username)
+│   ├── Post-sequence: pipe_db + evoflow + zone_fallback
+│   ├── style_analyzer.mirror_reply(reply, profile, user_msg)
+│   │   └── Adjust slang, punctuation, word count
+│   └── Return final reply
+├── If snap asked → _random_snap_reply() → "snap : eva_chill"
+└── ThreadManager.tick() every 1s
+├── ResourceGovernor.tick() → check CPU/RAM
+│   ├── Yellow → deny launches, Firefox GC
+│   ├── Orange → recycle contexts
+│   └── Red → kill worst browser
+├── EngineBridge: send heartbeat, drain logs/events
+├── JsWorkerBridge: get timing values
+└── ThreadManager: check thread status, restart if needed
+File: config.json (132 lines) + core/config_loader.py (588 lines)
+All sections with safe defaults:
+chat_timing:
+new_chat_delay_min/max_seconds (3-8)
+rest_interval_min/max_minutes (5-15)
+rest_duration_min/max_minutes (1-3)
+human_behavior:
+enabled, reaction_pause (0.25-0.85s), typing_speed (8-16 cps)
+read_reply (0.8-2.5s), micro_idle_chance (0.35)
+background_tabs:
+enabled, urls, periodic_visit (every 3-10 min)
+tab_open_delay (2-3s)
+performance:
+poll_interval (1.0s), block_resource_types, browser_engine
+ban_detection:
+enabled, ban_indicators, login_redirect_is_ban
+auto_delete_banned_session, auto_close_on_ban
+session_management:
+log_alive_count, sessions_dir_name
+replies:
+warmup_openers, warmup_chat_count (2-3)
+website_visits:
+pre_homepage_enabled, human_warmup_enabled
+context_pool:
+max_contexts, headless, geoip, humanize, block_resource_types
+engine_config:
+enabled, max_workers, cpu_threshold (0.6), mem_threshold (0.65)
+resource_governor:
+enabled, cpu_warn (0.6), mem_warn (0.65)
+mem_recycle (0.75), mem_redline (0.85)
+min_free_mb (1024), sample_interval (3.0s)
+runtime:
+mode (auto/safe), single_browser_max, multi_browser_min
+go_engine_enabled, js_worker_enabled, context_pool_enabled
+Config loading:
+load_config() → dict
+load_chat_timing(), load_human_behavior(), load_background_tabs()
+load_performance(), load_ban_detection(), load_session_management()
+load_replies(), load_website_visits(), load_context_pool_config()
+load_engine_config(), load_resource_governor_config()
+load_runtime_config()
+load_all_config() → all sections at once
+Every loader has safe defaults — missing or partial config.json never
+breaks the bot. Unknown keys are ignored, invalid values fall back to
+defaults.
+- account_session_store.py (~512 lines)
+- account_manager.py (~410 lines)
+- account_sessions/ directory (3 accounts: account_a273739e731d2694d4a59e7d,
+account_9001473cd2ef4d6ed8d7fdad, account_063cce9f4343619ac9bdfe89)
+Session Folder Structure (per account):
+account_sessions/account_{hash}/
+├── metadata.json     (schema_version, account_key, email, account_type,
+│                      saved_at, restore_url, storage_state, fingerprint,
+│                      history, proxy, last_url)
+├── storage_state.json (Playwright cookies + IndexedDB)
+├── fingerprint.json   (generated + observed browser fingerprint)
+├── history.json       (navigation history)
+└── .banned (flag file — present if account is banned)
+Account Lifecycle:
+1. Login → save_account_session() → creates session folder
+2. Restore → load_saved_account_sessions() → finds existing sessions
+3. Ban detected → delete_account_session() + mark_session_banned()
+4. Ban flag → .banned file + mark_session_banned() in account_manager
+Session Stock Summary:
+- count_alive_sessions(): usable accounts
+- count_banned_sessions(): flagged accounts
+- count_total_sessions(): all saved sessions
+- session_stock_summary(): {alive, banned, total}
+Fingerprint Capture:
+- _capture_observed_fingerprint(page) → canvas hash, WebGL, UA,
+screen, viewport, WebRTC, timezone, hardware info
+- Used for anti-detect consistency across sessions
+Ban Detection:
+- Ban indicators: "you have been banned", "account suspended", etc.
+- Login redirect mid-session → treated as ban
+- Auto-delete session + auto-close browser
+- Marked as banned in account_manager (never re-offered)
+C:\Users\papi\Desktop\22\ (Project Root)
+├── main.py                     # PyQt6 GUI Dashboard (entry point)
+├── paths.py                    # Project-root resolver (project_root())
+├── config.json                 # All configuration (132 lines)
+├── urls.txt                    # Legacy pre-homepage URL list (bg tabs removed)
+├── unique_sites.txt            # One site per line; bot visits one randomly between chats
+├── requirements.txt            # PyQt6, Playwright, psutil, camoufox
+├── chitchat-bot.ico            # App icon
+├── FLOW_SPEC.md                # Flow specification
+├── readme.txt                  # System documentation
+├── .venv/                      # Python virtual environment
+├── input/                      # TXT matcher trigger phrases (comma-separated)
+├── output/                     # TXT matcher replies (pipe-separated)
+├── account_sessions/           # Saved browser sessions (3 accounts)
+│   ├── account_a273739e731d2694d4a59e7d/
+│   │   ├── metadata.json
+│   │   ├── storage_state.json
+│   │   ├── fingerprint.json
+│   │   ├── history.json
+│   │   └── .banned (optional)
+│   ├── account_9001473cd2ef4d6ed8d7fdad/
+│   └── account_063cce9f4343619ac9bdfe89/
+├── browser/                    # Browser control & session persistence
+│   ├── __init__.py
+│   ├── browser_automation.py   # Core browser automation (~3600 lines)
+│   ├── browser_engine.py       # Chromium/Camoufox abstraction (~645 lines)
+│   ├── context_pool.py         # One browser, many contexts (~560 lines)
+│   ├── human_behavior.py       # Human-like browsing helpers
+│   ├── device_signin.py        # Device authentication (~211 lines)
+│   └── account_session_store.py# Session persistence (~512 lines)
+├── core/                       # Config, resources, accounts, auth dialog
+│   ├── __init__.py
+│   ├── config_loader.py        # Config loading + validation (588 lines)
+│   ├── resource_governor.py    # RAM/CPU watchdog (~447 lines)
+│   ├── engine_bridge.py        # Go engine bridge (~560 lines)
+│   ├── account_manager.py      # Serial-numbered account registry (~410 lines)
+│   └── signin_window.py        # Auth dialog (~347 lines)
+├── entry/                      # Orchestration / CLI
+│   ├── __init__.py
+│   ├── thread_manager.py       # Multi-thread orchestrator (~1250 lines)
+│   └── cli_runner.py           # CLI entry point
+└── chat/                       # Chat intelligence package
+    ├── __init__.py
+    ├── rules.py                # 6-flow engine + TXT matcher (1321 lines)
+    ├── common_scan.py          # Regex classifier (329 lines)
+    ├── chat_db.py              # 13 DB loader (231 lines)
+    ├── geo_handler.py          # Country rotation (173 lines)
+    ├── horny_flirty_db.py      # Horny/flirty DB (441 lines)
+    ├── content_filter.py       # Explicit content filter (63 lines)
+    ├── style_analyzer.py       # Style mirroring (179 lines)
+    ├── rule_bot.py             # ChatRuleBot orchestrator (65 lines)
+    └── database/
+        ├── __init__.py
+        └── loader.py           # Pipe + EvoFlow loader (215 lines)
+NOTE: legacy/dead files removed in cleanup (2026-09-08):
+  conversation_engine.py, build_upgraded_db.py, browser_setup.py,
+  js_bridge.py, extract_chat.py, full_test.py, test_chat.py, test_hint.py,
+  test_hints.py, test_trace.py
+1. User launches main.py (or start_bot.bat)
+2. DeviceSignin: Authenticate device with emmarn.com API
+3. SigninWindow: Show auth progress, wait for success
+4. main.py: Initialize ChitchatBotGUI (PyQt6)
+│   ├── Load config.json via config_loader.load_all_config()
+│   ├── Load saved account sessions via account_session_store
+│   ├── Initialize ThreadManager
+│   └── Show dashboard
+5. User clicks START
+├── main.py:start_bot()
+│   ├── Load accounts from file or restore from sessions
+│   ├── Load message templates from folder
+│   ├── Load Snapchat IDs from snap.txt
+│   ├── Validate all configuration
+├── ThreadManager:start_threads(N)
+│   ├── Load runtime config (mode, go_engine, context_pool)
+│   ├── If N>1: Start Go engine + ContextPool
+│   ├── Create AccountManager, load sessions
+│   ├── Start ContextPool (shared browser)
+│   ├── Wire ResourceGovernor callbacks
+│   ├── Stagger thread starts (0.5-1.5s)
+│   └── For each thread:
+│       ├── Create ChitchatAutomation instance
+│       ├── Acquire ContextPool slot (or launch own browser)
+│       ├── Launch browser via browser_engine
+│       ├── Apply stealth (fingerprints, WebRTC blocking)
+│       ├── Open background tabs
+│       ├── Navigate to chitchat.gg
+│       └── Enter chat loop
+└── Chat loop (per thread):
+├── Wait for user message
+├── Read message
+├── RuleEngine.decide_reply() generates response
+├── Apply human-like delays
+├── Send reply
+├── If snap requested → share snap
+├── Check for ban
+├── Check for max replies → move to next user
+└── Repeat
+1. ENGINE ABSTRACTION
+browser_engine.py abstracts Chromium vs Camoufox so all higher-level
+code works with standard Playwright Browser/Context/Page objects.
+2. CONTEXT POOL (2026 Golden Rule)
+One browser, many isolated contexts. ~1/100th memory cost vs per-thread
+browsers. Bounded by semaphore, thread-safe via RLock.
+3. RESOURCE GOVERNOR (Tiered Watchdog)
+Three-tier system (yellow/orange/red) driven by tick() — no extra threads.
+psutil-based sampling with configurable intervals.
+4. LAUNCH GATE
+Go engine + ResourceGovernor coordinate to prevent too many simultaneous
+browser launches that would freeze the PC.
+5. STEALTH FINGERPRINTING
+Coherent UA/platform/hardwareConcurrency/deviceMemory across all
+navigator properties. WebRTC IP leak prevention. PluginArray spoofing.
+6. NON-REPEATING RANDOM SELECTOR
+Exhausts all items before repeating — ensures every template/keyword
+is used before any repeats.
+7. ROUND-ROBIN ACCOUNT ASSIGNMENT
+AccountManager.next_idle_account() picks next idle account, skipping
+banned/exhausted/failed accounts.
+8. BACKGROUND TAB SIMULATION
+Persistent tabs (YouTube/Reddit/Wikipedia) visited periodically with
+full human-like behavior — makes browser look like real multi-tab user.
+9. STYLE MIRRORING
+Bot analyzes user's typing style and mirrors it (slang, punctuation,
+word count, emoji density) — creates natural feel.
+10. HORNEY DEFLECTION
+User sends horny message → bot deflects ONCE → continues normal sequence.
+Prevents sequence reset while handling inappropriate content gracefully.
+11. GENTLE DEGRADATION
+Every optional component (Go engine, JS worker, ContextPool, Camoufox)
+degrades to pure-Python fallback if unavailable. The bot always works.
+12. SIGNULED PROGRESSIVE DISCOVERY
+DeviceSignin → SigninWindow → Main GUI → Bot start. Each layer unlocks
+the next. Clean authentication flow.
+END OF DOCUMENTATION
