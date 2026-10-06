@@ -28,6 +28,8 @@ def install(context: Any,
             url_glob: Optional[str] = None,
             on_page: Optional[Callable[[str, str], None]] = None,
             debug: bool = False,
+            ws_url: str = "",
+            transport: str = "dom",
             log: Callable[[str], None] = print) -> Any:
     """Serve every document request for the mock host from :mod:`site`.
 
@@ -127,7 +129,8 @@ def install(context: Any,
                 on_page(parsed.path, who)
             except Exception:
                 pass
-        html = site.page_html(parsed.path, me=who, api_base=api_base, debug=debug)
+        html = site.page_html(parsed.path, me=who, api_base=api_base, debug=debug,
+                              ws_url=ws_url, transport=transport)
         # A tiny first-party cookie, like a real site sets on its own domain, so
         # the pipeline's "save the session again" step has something to keep.
         cookie = f"mock_cc_session={random.randint(100000, 999999)}; Path=/; Max-Age=3600"
@@ -136,4 +139,5 @@ def install(context: Any,
 
     glob = url_glob or f"**{HOST}/**"
     context.route(glob, _handler)
+
     return _handler

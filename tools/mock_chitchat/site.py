@@ -30,6 +30,11 @@ from urllib.parse import parse_qs, urlparse
 
 STRANGER_NAME = "Stranger42"
 
+#: The endpoint the mock chat page dials.  It is the real one on purpose: the
+#: pages are served over https, so they cannot open an insecure ws:// socket —
+#: the test harness forwards this connection to the local stand-in instead.
+DEFAULT_WS_URL = "wss://api.chitchat.gg/socket.io/?EIO=4&transport=websocket"
+
 
 class ChatBackend:
     """Thread-safe chat history shared by every participant."""
@@ -221,10 +226,72 @@ _CHAT_BODY = """
   var ME = __ME_JSON__;
   var API = __API_JSON__;
   var DEBUG = __DEBUG_JSON__;
+  var WS_URL = __WS_JSON__;
+  var TRANSPORT = __TRANSPORT_JSON__;
   var since = 0;
   var rendered = {};
   var box = document.getElementById('messages');
   var status = document.getElementById('status');
+  var sio = null;              // this page's own chat socket (ws mode)
+  var conversationId = '';
+
+  // ---- ws mode: the page speaks Engine.IO v4 + Socket.IO itself ----------
+  function sioSend(event, payload) {
+    if (!sio || sio.readyState !== 1) { return false; }
+    sio.send('42' + JSON.stringify(payload === undefined ? [event] : [event, payload]));
+    return true;
+  }
+
+  function connectSocket() {
+    // WS_URL already carries ?EIO=4&transport=websocket; only the mock identity
+    // hint is added (the real site has the token cookie instead).
+    var url = WS_URL + (WS_URL.indexOf('as=') >= 0 ? ''
+                        : (WS_URL.indexOf('?') >= 0 ? '&' : '?')
+                          + 'as=' + encodeURIComponent(ME));
+    status.textContent = 'connecting to the chat socket …';
+    sio = new WebSocket(url);
+    sio.onopen = function () { status.textContent = 'socket open as ' + ME; };
+    sio.onmessage = function (ev) {
+      var data = String(ev.data || '');
+      if (data.charAt(0) === '0') {                 // engine.io handshake
+        sio.send('40' + JSON.stringify({ release: 'mock-e2e' }));
+        return;
+      }
+      if (data === '2') { sio.send('3'); return; }  // ping → pong
+      if (data.charAt(0) !== '4') { return; }
+      if (data.charAt(1) === '0') {                 // socket.io connected
+        sio.send('42' + JSON.stringify(['presenceSync']));
+        status.textContent = 'connected as ' + ME + ' (socket)';
+        return;
+      }
+      if (data.charAt(1) !== '2') { return; }
+      var frame = JSON.parse(data.slice(2));
+      var event = frame[0];
+      var payload = frame[1] || {};
+      if (event === 'matchUpdate') {
+        var match = payload.match || {};
+        var conversation = match.conversation || {};
+        var closure = match.closure || conversation.closure || {};
+        if (conversation.id) { conversationId = conversation.id; }
+        if (closure.closed) {
+          window.MOCK_CHAT_ENDED = true;
+          status.textContent = 'the chat was closed over the socket';
+        }
+        return;
+      }
+      if (event === 'chatMessage' && payload.message) {
+        var message = payload.message;
+        bubble({
+          id: message.id || message.nonce || String(Math.random()),
+          author: (message.author && message.author.username) || '?',
+          text: message.content || ''
+        });
+        status.textContent = 'connected as ' + ME + ' (socket · '
+                             + box.children.length + ' messages)';
+      }
+    };
+    sio.onclose = function () { status.textContent = 'the chat socket closed'; };
+  }
 
   function bubble(msg) {
     if (rendered[msg.id]) { return; }        // one bubble per message, ever
@@ -298,14 +365,22 @@ _CHAT_BODY = """
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ author: ME })
   }).catch(function () {});
-  setInterval(poll, 700);
-  poll();
+  if (TRANSPORT === 'ws' && WS_URL) {
+    connectSocket();
+  } else {
+    setInterval(poll, 700);
+    poll();
+  }
 
   function send() {
     var el = document.querySelector('textarea[name="message"]');
     var text = (el.value || '').trim();
     if (!text) { return; }
     el.value = '';
+    if (sioSend('sendMessage', { conversationId: conversationId, content: text,
+                                 type: 'TEXT' })) {
+      return;                       // the server echoes it back as a chatMessage
+    }
     fetch(API + '/api/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -321,11 +396,13 @@ _CHAT_BODY = """
   });
   document.getElementById('skip').addEventListener('click', function (ev) {
     ev.preventDefault();
-    fetch(API + '/api/leave', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ author: ME })
-    }).catch(function () {});
+    if (!sioSend('skip', { conversationId: conversationId })) {
+      fetch(API + '/api/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ author: ME })
+      }).catch(function () {});
+    }
     document.querySelector('textarea[name="message"]').disabled = true;
     document.getElementById('ended').style.display = 'block';
     document.getElementById('ended-text').textContent =
@@ -349,8 +426,15 @@ def page_html(path: str,
               me: str = "EvaUser",
               api_base: str = "",
               stranger: str = STRANGER_NAME,
-              debug: bool = False) -> str:
-    """Return the HTML for one mock page."""
+              debug: bool = False,
+              ws_url: str = "",
+              transport: str = "dom") -> str:  # noqa: D417
+    """Return the HTML for one mock page.
+
+    ``transport="ws"`` makes the chat page speak Engine.IO v4 + Socket.IO to
+    ``ws_url`` itself (the same frames the real site uses) instead of polling
+    the local HTTP API, so a socket-aware bot can be tested end to end.
+    """
     path = str(path or "/")
     if path.startswith("/chat"):
         body, title = _CHAT_BODY, "chitchat mock · chat"
@@ -363,6 +447,8 @@ def page_html(path: str,
     # string, so names with dots/spaces ("sadia.6.7") stay valid script.
     html = (html.replace("__ME_JSON__", json.dumps(str(me)))
                 .replace("__API_JSON__", json.dumps(str(api_base or "").rstrip("/")))
+                .replace("__WS_JSON__", json.dumps(str(ws_url or DEFAULT_WS_URL)))
+                .replace("__TRANSPORT_JSON__", json.dumps(str(transport or "dom")))
                 .replace("__DEBUG_JSON__", "true" if debug else "false"))
     return (html.replace("__ME__", html_escape(str(me)))
                 .replace("__STRANGER__", html_escape(str(stranger))))
@@ -376,6 +462,8 @@ def make_handler(backend: ChatBackend,
                  *,
                  me_for_page=lambda headers: "EvaUser",
                  api_base_for_page=lambda headers: "",
+                 ws_url_for_page=lambda headers: "",
+                 transport: str = "dom",
                  log=print):
     """Build an ``http.server`` handler bound to ``backend``."""
 
@@ -423,7 +511,9 @@ def make_handler(backend: ChatBackend,
                 return self._json({"messages": backend.all()})
             if path in ("/", "/start/new", "/chat", "/chat/"):
                 me = me_for_page(self.headers)
-                html = page_html(path, me=me, api_base=api_base_for_page(self.headers))
+                html = page_html(path, me=me, api_base=api_base_for_page(self.headers),
+                                 ws_url=ws_url_for_page(self.headers),
+                                 transport=transport)
                 return self._send(200, html.encode("utf-8"))
             return self._send(404, b"not found")
 

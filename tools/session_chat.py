@@ -46,6 +46,7 @@ blind without credentials), 1 = usage or startup error.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import signal
 import sys
@@ -192,7 +193,22 @@ def connect_only(automation, log=print):
                                        fingerprint=_fingerprint or None)
             except Exception as error:
                 log(f"  [Identity] stealth layer not applied: {error}")
-            page = automation.context.new_page()
+            if automation.context is not None:
+                page = automation.context.new_page()
+            else:
+                # Persistent-profile mode: the context belongs to the browser
+                # handle, ``automation.context`` is only attached by a session
+                # attempt (this dry run deliberately skips that).
+                context = getattr(browser, "_context", None)
+                if context is None:
+                    try:
+                        context = (browser.contexts or [None])[0]
+                    except Exception:
+                        context = None
+                if context is None:
+                    return False, "no browser context to open a page with"
+                automation.context = context
+                page = context.new_page()
         except Exception as error:
             return False, f"could not open a page: {error}"
         verified = automation._verify_fingerprint_before_login(page, purpose="dry run")
@@ -202,6 +218,169 @@ def connect_only(automation, log=print):
     except Exception as error:
         return False, f"{type(error).__name__}: {error}"
     finally:
+        try:
+            automation.is_running = False
+            automation._close_camoufox()
+        except Exception:
+            pass
+
+
+def _page_username(automation, page, log=print):
+    """Read the account's own username from the open chat page (best effort)."""
+    try:
+        from browser import chat_reader
+        _messages, diag = chat_reader.extract_with_diag(page)
+        name = str((diag or {}).get("myUsername") or "").strip()
+        if name:
+            log(f"  [WS] account username from the page: {name}")
+            return name
+    except Exception as error:
+        log(f"  [WS] could not read the username from the page: {error}")
+    return ""
+
+
+def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=print,
+                   ws_url=None, send_event="", dom_fallback=True, probe=False):
+    """Restore the session in the browser, then chat over the site's WebSocket.
+
+    The browser stays open (and logged in) as the session holder, but the
+    conversation itself runs on the socket: incoming SMS arrive as
+    ``chatMessage`` events and the replies are emitted from the backend.  If the
+    socket cannot confirm a delivery, the reply falls back to typing into the
+    page (``dom_fallback``), so a chat is never lost.
+    """
+    from core.chat_ws import DEFAULT_WS_URL, ChatWebSocket, cookies_header
+
+    started = time.time()
+    counts = {"messages_in": 0, "messages_out": 0}
+    stop_reason = "finished"
+    log(f"[Session] running {account.get('email')} over WebSocket (session-only)")
+    automation = build_automation(account, headless=headless, thread_id=thread_id,
+                                  log=log)
+    chat = None
+    page = None
+    try:
+        automation.is_running = True
+        browser = automation._launch_camoufox()
+        if browser is None:
+            return {"account": account.get("email"), "ok": False,
+                    "reason": "browser launch failed", "seconds": 0.0, **counts}
+        context = getattr(browser, "_context", None)
+        if context is None:
+            try:
+                context = (browser.contexts or [None])[0]
+            except Exception:
+                context = None
+        automation.context = context
+
+        # The account's anti-detect layer before the site is touched, exactly
+        # like a normal run — the page is the session holder, and the socket
+        # then reuses the cookies that the restored session provided.
+        try:
+            from browser.browser_engine import apply_chromium_stealth
+            _kwargs, _fingerprint = automation._identity_context_options()
+            apply_chromium_stealth(context, log_fn=log, fingerprint=_fingerprint or None)
+        except Exception as error:
+            log(f"  [Identity] stealth layer not applied: {error}")
+        # The account's saved cookies are imported by the restore step below.
+        page = context.new_page()
+        if not automation.restore_saved_account_session(page):
+            return {"account": account.get("email"), "ok": False,
+                    "reason": "session restore failed",
+                    "seconds": round(time.time() - started, 1), **counts}
+
+        cookies = []
+        try:
+            cookies = context.cookies()
+        except Exception as error:
+            log(f"  [WS] could not read the live cookies: {error}")
+        header = cookies_header(cookies)
+        log(f"  [WS] {len(cookies)} browser cookies · "
+            f"{len(header.split(';')) if header else 0} for chitchat.gg")
+
+        username = _page_username(automation, page, log=log)
+        if probe:
+            try:
+                from core.chat_ws import probe_send_events_from_page
+                candidates = probe_send_events_from_page(page, log=log)
+                if candidates and not send_event:
+                    send_event = candidates[0]
+                    log(f"  [WS] probe chose the send event: {send_event}")
+            except Exception as error:
+                log(f"  [WS] probe failed: {error}")
+
+        from chat.rule_bot import ChatRuleBot
+        bot = ChatRuleBot()
+        state = bot.new_conversation()
+        log(f"  [ChatRuleBot] active over WS — state keys={len(state)}")
+
+        def answer(text, _raw):
+            counts["messages_in"] += 1
+            log(f"  [SMS]   user: {text}")
+            try:
+                reply = bot.reply(text, state)
+            except Exception as error:
+                log(f"  [ChatRuleBot] reply failed: {type(error).__name__}: {error}")
+                return
+            try:
+                delay = automation._get_reply_delay()
+                if delay > 0:
+                    time.sleep(delay)
+            except Exception:
+                pass
+            ok, how = chat.send_message(reply)
+            if ok:
+                counts["messages_out"] += 1
+                log(f"  [REPLY] bot: {reply}   (ws · {how})")
+                return
+            log(f"  [WS] reply not confirmed over the socket ({how})")
+            if dom_fallback and page is not None:
+                try:
+                    if automation.send_chat_message(page, reply, 1):
+                        counts["messages_out"] += 1
+                        log(f"  [REPLY] bot: {reply}   (dom fallback)")
+                except Exception as error:
+                    log(f"  [WS] dom fallback failed: {error}")
+
+        chat = ChatWebSocket(cookie_header=header, url=ws_url or DEFAULT_WS_URL,
+                             my_username=username, send_event=send_event,
+                             log=log, on_message=answer)
+        chat.start()
+        if not chat.wait_connected(30.0):
+            log(f"  [WS] socket did not connect: {chat.client.last_error}")
+            return {"account": account.get("email"), "ok": False,
+                    "reason": f"ws connect failed ({chat.client.last_error})",
+                    "seconds": round(time.time() - started, 1), **counts}
+        log(f"  [WS] live — conversation={chat.conversation_id[:12]} "
+            f"participants={chat.stats().get('participants')}")
+
+        deadline = time.time() + minutes * 60 if minutes else 0
+        while automation.is_running:
+            if deadline and time.time() > deadline:
+                stop_reason = f"time limit ({minutes:.0f} min)"
+                log(f"  [Timer] {minutes:.0f} minute limit reached — stopping")
+                break
+            time.sleep(0.5)
+        if chat is not None and chat.closed_by_peer:
+            stop_reason = "the chat was closed by the user"
+        stats = chat.stats() if chat is not None else {}
+        log(f"  [WS] events: {json.dumps(stats.get('events') or {}, ensure_ascii=False)}")
+        return {"account": account.get("email"), "ok": True, "reason": stop_reason,
+                "seconds": round(time.time() - started, 1),
+                "ws": {k: stats.get(k) for k in ("conversation", "participants",
+                                                 "confirmed_event", "events")},
+                **counts}
+    except Exception as error:
+        log(f"  [Error] {type(error).__name__}: {error}")
+        return {"account": account.get("email"), "ok": False,
+                "reason": f"error: {type(error).__name__}",
+                "seconds": round(time.time() - started, 1), **counts}
+    finally:
+        try:
+            if chat is not None:
+                chat.stop()
+        except Exception:
+            pass
         try:
             automation.is_running = False
             automation._close_camoufox()
@@ -316,6 +495,17 @@ def main() -> int:
                     help="open + verify + restore, then close (connection test)")
     ap.add_argument("--plan-only", action="store_true",
                     help="show the session plan without starting a browser")
+    ap.add_argument("--transport", choices=("dom", "ws"), default="dom",
+                    help="dom = read/type in the page (default), "
+                         "ws = chat over the site's own WebSocket")
+    ap.add_argument("--ws-url", default=None,
+                    help="override the socket URL (default: api.chitchat.gg)")
+    ap.add_argument("--ws-send-event", default="",
+                    help="emit name used to send a message (tools/ws_chat.py --probe)")
+    ap.add_argument("--ws-probe", action="store_true",
+                    help="read the send event name from the chat bundle first")
+    ap.add_argument("--no-dom-fallback", action="store_true",
+                    help="do not type into the page when the socket cannot confirm")
     ap.add_argument("--delay", type=float, default=5.0,
                     help="seconds between accounts when --all is used")
     args = ap.parse_args()

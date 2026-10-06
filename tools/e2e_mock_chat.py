@@ -19,6 +19,14 @@ Usage:
     python3 tools/e2e_mock_chat.py                       # headless, ~1 minute
     python3 tools/e2e_mock_chat.py --session data/account_sessions/account_xxx
     python3 tools/e2e_mock_chat.py --log /tmp/e2e.log --visible
+    python3 tools/e2e_mock_chat.py --transport ws        # chat over the live socket
+
+``--transport ws`` keeps the same session/identity/fingerprint steps but runs the
+conversation over the WebSocket stand-in (``tools/mock_chitchat/ws_server.py``,
+Engine.IO v4 + Socket.IO, the frames captured from the real site): the bot
+connects with the restored cookies, receives the user's messages as
+``chatMessage`` events and replies by emitting the send event — the page itself
+is only the session holder.
 """
 
 from __future__ import annotations
@@ -393,10 +401,17 @@ def bot_display_name(account: dict) -> str:
 # --------------------------------------------------------------------------- #
 
 class StrangerBrowser(threading.Thread):
-    """A real Chromium that types messages at the mock site and reads replies."""
+    """A real Chromium that types messages at the mock site and reads replies.
+
+    In ``--transport ws`` mode the page it types into speaks Socket.IO itself, so
+    the message leaves the user's browser as a real ``sendMessage`` frame and the
+    bot's reply arrives as a real ``chatMessage`` event.
+    """
 
     def __init__(self, *, backend, api_base, bot_name, log, done_event,
-                 name="Stranger42", start_event=None, debug=False, recorder=None):
+                 name="Stranger42", start_event=None, debug=False, recorder=None,
+                 transport="dom", ws_url="", ws_port=0, ws_token="",
+                 bot_ready_event=None):
         super().__init__(name="stranger-browser", daemon=True)
         self.backend = backend
         self.api_base = api_base
@@ -411,6 +426,11 @@ class StrangerBrowser(threading.Thread):
         self.finished = threading.Event()
         self.debug = bool(debug)
         self.recorder = recorder
+        self.transport = str(transport or "dom")
+        self.ws_url = str(ws_url or "")
+        self.ws_port = int(ws_port or 0)
+        self.ws_token = str(ws_token or "")
+        self.bot_ready_event = bot_ready_event
         self.page = None
 
     # -- helpers ---------------------------------------------------------
@@ -431,8 +451,21 @@ class StrangerBrowser(threading.Thread):
         browser = pw.chromium.launch(**options)
         context = browser.new_context(viewport={"width": 1280, "height": 900},
                                       locale="en-US")
+        if self.transport == "ws":
+            try:
+                context.grant_permissions(["local-network-access"],
+                                          origin="https://app.chitchat.gg")
+            except Exception as error:
+                self.log(f"[Stranger] local-network-access not granted: {error}")
+            if self.ws_token and self.ws_port:
+                try:
+                    context.add_cookies([{"name": "token", "value": self.ws_token,
+                                          "url": f"http://127.0.0.1:{self.ws_port}/"}])
+                except Exception as error:
+                    self.log(f"[Stranger] token cookie not added: {error}")
         routes.install(context, self.backend, me=self.name, api_base="",
-                       log=self.log, debug=self.debug)
+                       log=self.log, debug=self.debug,
+                       ws_url=self.ws_url, transport=self.transport)
         page = context.new_page()
         if self.recorder is not None:
             self.recorder.watch(page, "user")
@@ -475,6 +508,11 @@ class StrangerBrowser(threading.Thread):
                      f"(url={page.url})")
             self.start_event.set()
 
+            # The socket bot is ready with the handshake, but the *session holder*
+            # page should be on the chat page before the user says anything.
+            if self.bot_ready_event is not None:
+                self.log("[Stranger] waiting for the bot to open the chat page …")
+                self.bot_ready_event.wait(timeout=120)
             if not self.backend.wait_for_participant(self.bot_name, timeout=120):
                 raise RuntimeError(f"bot account {self.bot_name} never appeared in the chat")
             self.log(f"[Stranger] the bot account {self.bot_name} is present in the chat")
@@ -489,6 +527,14 @@ class StrangerBrowser(threading.Thread):
             self._wait_for_reply(page, 2)
             self.replies = self._bubbles_from(page, self.bot_name)
             self.log(f"[Stranger] got reply #2 from {self.bot_name}: {self.replies[-1]}")
+
+            if self.transport == "ws":
+                try:
+                    page.locator("button.bg-warning").first.click(timeout=5000)
+                    self.log("[Stranger] clicked SKIP — the closure should travel "
+                             "over the socket")
+                except Exception as error:
+                    self.log(f"[Stranger] could not click SKIP: {error}")
         except Exception as error:
             self.error = f"{type(error).__name__}: {error}"
             self.traceback = traceback.format_exc()
@@ -550,7 +596,13 @@ def main() -> int:
     parser.add_argument("--hard-timeout", type=float, default=0.0,
                         help="absolute safety stop in seconds (0 = minutes*60+150); "
                              "artifacts are written before exiting")
+    parser.add_argument("--transport", choices=("dom", "ws"), default="dom",
+                        help="dom = the page polls/receives over HTTP (request 9), "
+                             "ws = the conversation runs over the chat WebSocket")
+    parser.add_argument("--ws-send-event", default="",
+                        help="override the emit name used to send a chat message")
     args = parser.parse_args()
+    ws_mode = args.transport == "ws"
 
     log = RunLog(Path(args.log), debug=args.debug)
     recorder = DebugRecorder(artifacts_dir=Path(args.artifacts), log=log,
@@ -560,6 +612,17 @@ def main() -> int:
     if args.debug:
         log("[E2E] DEBUG mode: API/console/network traces + DOM snapshots + artifacts")
     log("=" * 72)
+
+    # Machines without ms-playwright browsers (CI sandboxes): if a Chromium
+    # binary was dropped in /tmp, use it and point the loader at its libraries.
+    if not os.environ.get("EVA_CHROMIUM_EXECUTABLE") and Path("/tmp/chromium").exists():
+        os.environ["EVA_CHROMIUM_EXECUTABLE"] = "/tmp/chromium"
+        os.environ["EVA_CHROMIUM_EXTRA_ARGS"] = (
+            "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage")
+        if Path("/tmp/chromium-libs/lib").is_dir():
+            os.environ["LD_LIBRARY_PATH"] = (
+                "/tmp/chromium-libs/lib:" + os.environ.get("LD_LIBRARY_PATH", ""))
+        print("[E2E] using the out-of-band Chromium at /tmp/chromium")
 
     work_dir = Path("/tmp/eva_e2e_sessions")
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -593,6 +656,51 @@ def main() -> int:
         "through a Playwright route hook (same-origin, real HTTPS requests)")
     log(f"[MockSite] optional: the same stand-in is browsable at {api_base}/chat/")
 
+    captured = {}          # automation handle / socket secrets the hooks share
+
+    # -- the site's chat WebSocket, standing in for api.chitchat.gg -------- #
+    ws_server = None
+    ws_page_url = ""          # what the mock pages dial (the real ws endpoint)
+    ws_backend_url = ""       # the local stand-in the backend client talks to
+    ws_saved_cookie_names = set()
+    if ws_mode:
+        from tools.mock_chitchat.ws_server import ChitchatSocketServer
+        token_map = {}
+        session_token = ""
+        try:
+            from core.chat_ws import load_session_cookies
+            for cookie in load_session_cookies(str(account.get("storage_state_path") or "")):
+                if cookie.get("name"):
+                    ws_saved_cookie_names.add(str(cookie["name"]))
+                if str(cookie.get("name")) == "token" and cookie.get("value"):
+                    session_token = str(cookie["value"])
+                    token_map[session_token] = str(account["_display_name"])
+        except Exception as error:
+            log(f"[MockWS] could not read the session cookies: {error}")
+        ws_server = ChitchatSocketServer(log=log, ping_interval=25.0,
+                                         token_map=token_map)
+        ws_backend_url = ws_server.start()
+        ws_page_url = ws_backend_url
+        log("[MockWS] the chat socket stand-in is listening at "
+            f"{ws_backend_url} (Engine.IO v4 + Socket.IO, the frames captured "
+            "from the real site)")
+        # The mock pages are served over https, so a plain ws:// dial is blocked
+        # by mixed content + Local Network Access rules; these two switches lift
+        # that for the local stand-in only (a test-harness concern, not the bot).
+        ws_extra = ("--unsafely-treat-insecure-origin-as-secure="
+                    f"http://127.0.0.1:{ws_server.port} "
+                    "--disable-features=LocalNetworkAccessChecks,"
+                    "BlockInsecurePrivateNetworkRequests")
+        os.environ["EVA_CHROMIUM_EXTRA_ARGS"] = (
+            (os.environ.get("EVA_CHROMIUM_EXTRA_ARGS", "") + " " + ws_extra).strip())
+        ws_page_url = ws_backend_url
+        log(f"[MockWS] the mock pages dial the stand-in directly "
+            f"({ws_page_url}) so both browsers use a real socket; the browser is "
+            f"started with {ws_extra}")
+        log(f"[MockWS] identity: the account's own token cookie maps to "
+            f"{account['_display_name']!r} — both sockets prove cookie auth")
+        captured["ws_session_token"] = session_token
+
     # -- route hook for the bot's own browser ----------------------------- #
     # Import through the shared test helper: on Linux the module's Windows/Qt
     # imports (winsound, PyQt6) are stubbed there, exactly like the test suite.
@@ -604,9 +712,37 @@ def main() -> int:
         return 3
     log(f"[E2E] loaded browser.browser_automation ({how})")
 
+    def ws_prepare_context(context, who, log_fn):
+        """Let the mock page reach the local socket + hand it the session token.
+
+        The account's cookies belong to app.chitchat.gg, so the *page's* socket
+        handshake to 127.0.0.1 would look anonymous; the account's own token
+        cookie is added for the stand-in's origin, so both sockets identify the
+        account exactly like the real site does (by the token).
+        """
+        try:
+            context.grant_permissions(["local-network-access"],
+                                      origin="https://app.chitchat.gg")
+        except Exception as error:
+            log_fn(f"[MockWS] could not grant local-network-access: {error}")
+        token = str(captured.get("ws_session_token") or "")
+        if token and ws_server is not None:
+            try:
+                context.add_cookies([{"name": "token", "value": token,
+                                      "url": f"http://127.0.0.1:{ws_server.port}/"}])
+                log_fn("[MockWS] the page's socket authenticates with the account's "
+                       "own token cookie")
+            except Exception as error:
+                log_fn(f"[MockWS] could not add the token cookie to the page: {error}")
+
     original_cls = automation_module.ChitchatAutomation
-    captured = {}
     bot_name = account["_display_name"]
+    bot_on_chat_page = threading.Event()
+
+    def bot_page_loaded(path, who):
+        log(f"[MockSite] bot browser loaded {path}")
+        if "/chat" in str(path):
+            bot_on_chat_page.set()
 
     class MockChitchatAutomation(original_cls):
         """The real bot, with the mock site wired into its browser context."""
@@ -624,10 +760,12 @@ def main() -> int:
                 except Exception:
                     context = None
             if context is not None:
+                if ws_mode:
+                    ws_prepare_context(context, bot_name, log)
                 routes.install(
                     context, backend, me=bot_name, api_base="", log=log,
-                    debug=args.debug,
-                    on_page=lambda path, who: log(f"[MockSite] bot browser loaded {path}"))
+                    debug=args.debug, ws_url=ws_page_url,
+                    transport=args.transport, on_page=bot_page_loaded)
                 log("[MockSite] ✓ route hook installed on the account's browser context")
                 # Watch every page this account opens (console/errors/network).
                 # Listeners fire on the automation's own thread, so this is safe.
@@ -727,6 +865,34 @@ def main() -> int:
 
     threading.Thread(target=hard_stop, name="e2e-hard-stop", daemon=True).start()
 
+    # Socket evidence has to be sampled *while* the run is alive: the clients
+    # disconnect (and are dropped from the stand-in) when the session stops.
+    ws_evidence = {"usernames": set(), "cookies": set(), "events": {}, "snapshot": []}
+
+    def sample_ws():
+        if ws_server is None:
+            return
+        try:
+            for client in list(ws_server.clients):
+                ws_evidence["usernames"].add(str(client.get("username") or ""))
+                for part in str(client.get("cookie") or "").split(";"):
+                    name = part.split("=", 1)[0].strip()
+                    if name:
+                        ws_evidence["cookies"].add(name)
+            counts = {}
+            for entry in list(ws_server.sent_to_client):
+                event = str(entry.get("event") or "")
+                counts[event] = counts.get(event, 0) + 1
+            ws_evidence["events"] = counts
+            ws_evidence["snapshot"].append({
+                "at": round(time.time(), 2),
+                "clients": [str(c.get("username") or "") for c in ws_server.clients],
+                "messages": len(ws_server.messages),
+                "frames_out_total": sum(counts.values()),
+            })
+        except Exception:
+            pass
+
     # The pages push their own DOM state to the mock backend; this thread just
     # reads that (plain Python, no Playwright cross-thread calls).
     def state_watcher():
@@ -741,6 +907,7 @@ def main() -> int:
                 seen += 1
                 where = "bot" if str(entry.get("author")) == bot_name else "user"
                 log.debug("[dom] " + format_state(where, entry))
+            sample_ws()
 
     if args.debug:
         backend.request_dump(bot_name)          # the bot's DOM, for the artifacts
@@ -748,7 +915,11 @@ def main() -> int:
     done_event = threading.Event()
     stranger = StrangerBrowser(backend=backend, api_base=api_base, bot_name=bot_name,
                                log=log, done_event=done_event, name=site.STRANGER_NAME,
-                               debug=args.debug, recorder=recorder)
+                               debug=args.debug, recorder=recorder,
+                               transport=args.transport, ws_url=ws_page_url,
+                               ws_port=(ws_server.port if ws_server else 0),
+                               ws_token=str(captured.get("ws_session_token") or ""),
+                               bot_ready_event=bot_on_chat_page)
     stranger.start()
 
     watcher = threading.Thread(target=state_watcher, name="e2e-state-watcher", daemon=True)
@@ -776,9 +947,17 @@ def main() -> int:
     stopper = threading.Thread(target=stop_when_done, name="e2e-stopper", daemon=True)
     stopper.start()
 
-    log("[E2E] starting the real session runner (tools/session_chat.run_account)")
-    summary = session_chat.run_account(usable_account, headless=not args.visible,
-                                       minutes=args.minutes, thread_id=1, log=log)
+    if ws_mode:
+        log("[E2E] starting the real session runner over the WebSocket "
+            "(tools/session_chat.run_account_ws)")
+        summary = session_chat.run_account_ws(
+            usable_account, headless=not args.visible, minutes=args.minutes,
+            thread_id=1, log=log, ws_url=ws_backend_url or None,
+            send_event=args.ws_send_event)
+    else:
+        log("[E2E] starting the real session runner (tools/session_chat.run_account)")
+        summary = session_chat.run_account(usable_account, headless=not args.visible,
+                                           minutes=args.minutes, thread_id=1, log=log)
 
     done_event.wait(timeout=30)
     stranger.join(timeout=30)
@@ -790,6 +969,24 @@ def main() -> int:
     def has(pattern: str) -> bool:
         return any(pattern in line for line in lines)
 
+    sample_ws()                                   # last snapshot before the verdict
+    ws_cookies_sent = sorted(ws_evidence["cookies"])
+    ws_events = dict(ws_evidence["events"])
+    ws_participants = sorted(n for n in ws_evidence["usernames"] if n)
+    ws_cookie_hits = sorted(set(ws_cookies_sent) & ws_saved_cookie_names)
+    ws_transcript = [(str((m.get("author") or {}).get("username")
+                          if isinstance(m.get("author"), dict) else m.get("author")),
+                      str(m.get("content") or ""))
+                     for m in ((ws_server.messages if ws_server is not None else []))]
+    ws_server_frames = list((ws_server.sent_to_client if ws_server is not None else []))
+    if ws_mode:
+        log("[MockWS] accounts seen by the socket stand-in: "
+            + (", ".join(ws_participants) or "<none>"))
+        log("[MockWS] cookie names on the socket handshake: "
+            + (", ".join(ws_cookies_sent[:12]) or "<none>"))
+        log("[MockWS] session cookie names matched against the saved session: "
+            + (", ".join(ws_cookie_hits) or "<none>"))
+
     checks = {
         "browser launched (real Chromium)": has("[Browser]") and has("Using the installed browser"),
         "account identity + own Chrome profile": has("[Identity] reusing the same browser"),
@@ -798,12 +995,28 @@ def main() -> int:
                                             or has("cookies come from the profile itself"),
         "session restored + verified by the site": has("[Restore] ✓ saved session verified"),
         "chat page opened for the account": has("bot browser loaded /chat/"),
-        "the user's message detected": has("Stranger:") or has("[SMS]"),
+        "the user's message detected": (has("[WS] incoming SMS from") if ws_mode
+                                        else (has("Stranger:") or has("[SMS]"))),
         "the bot replied through ChatRuleBot": has("ChatRuleBot reply") or has("[REPLY]"),
         "reply visible in the user's browser": bool([r for r in stranger.replies
                                                     if r and r.strip()]),
         "no user-side error": not stranger.error,
     }
+    if ws_mode:
+        checks.update({
+            "engine.io + socket.io handshake completed": has("[WS] socket.io connected"),
+            "the restored session cookies went out on the socket handshake":
+                bool(ws_cookie_hits),
+            "the account identity came from its own session (pid match)":
+                has("[WS] matchUpdate") or bot_name in ws_participants,
+            "incoming SMS was read from chatMessage events":
+                ws_events.get("chatMessage", 0) >= 2 and has("[WS] incoming SMS from"),
+            "the reply was confirmed by the server echo":
+                has("[WS] ✓ delivery confirmed"),
+            "no DOM fallback was needed": not has("(dom fallback)"),
+            "the chat closure travelled over the socket":
+                has("[WS] the chat was closed") or has("[WS] matchUpdate"),
+        })
     passed = all(checks.values())
 
     log("")
@@ -820,15 +1033,30 @@ def main() -> int:
     log(f"  cookies sent by the restored session: {cookies.get('count', 0)} "
         f"({', '.join((cookies.get('names') or [])[:12])})")
     log(f"  chat transcript: {json.dumps(backend.all(), ensure_ascii=False)}")
+    if ws_mode:
+        log(f"  socket events sent to clients (counts): "
+            f"{json.dumps(ws_events, ensure_ascii=False)}")
+        log(f"  socket transcript: {json.dumps(ws_transcript, ensure_ascii=False)}")
+        log(f"  socket clients seen: {ws_participants}")
 
     results = {
         "log": str(log.path),
+        "transport": args.transport,
         "session": usable_account.get("email"),
         "cookies_sent": cookies.get("count", 0),
         "messages_in": summary.get("messages_in"),
         "messages_out": summary.get("messages_out"),
         "user_replies": stranger.replies,
     }
+    if ws_mode:
+        results.update({
+            "ws_cookies_on_handshake": ws_cookies_sent,
+            "ws_cookie_names_matched": ws_cookie_hits,
+            "ws_events_sent": ws_events,
+            "ws_transcript": ws_transcript,
+            "ws_clients": ws_participants,
+            "ws_confirmed_event": (summary.get("ws") or {}).get("confirmed_event"),
+        })
     if not passed:
         log("")
         log("[E2E] what to look at / ki check korben:")
@@ -842,6 +1070,20 @@ def main() -> int:
             artifacts = recorder.dump(backend=backend, checks=checks,
                                       reason=stranger.error or summary.get("reason") or "",
                                       results=results)
+            if artifacts is not None and ws_server is not None:
+                try:
+                    (artifacts / "ws_transcript.json").write_text(
+                        json.dumps({"transcript": ws_transcript,
+                                    "events_sent": ws_events,
+                                    "cookie_names_on_handshake": ws_cookies_sent,
+                                    "cookie_names_matched": ws_cookie_hits,
+                                    "clients": ws_participants,
+                                    "sent_to_client": ws_server_frames,
+                                    "snapshots": ws_evidence["snapshot"]},
+                                   indent=2, ensure_ascii=False), encoding="utf-8")
+                    log("[E2E]   + ws_transcript.json (socket frames in/out)")
+                except Exception as error:
+                    log(f"[E2E] ws artifact dump failed: {error}")
             log(f"[E2E] artifacts: {artifacts}")
             log(f"[E2E]   read SUMMARY.txt first, then events_*.log / dom_trace.log")
         except Exception as error:
@@ -853,6 +1095,11 @@ def main() -> int:
         server.shutdown()
     except Exception:
         pass
+    if ws_server is not None:
+        try:
+            ws_server.stop()
+        except Exception:
+            pass
     log.close()
     return 0 if passed else 1
 

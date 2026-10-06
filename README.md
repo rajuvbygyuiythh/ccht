@@ -89,7 +89,9 @@ data/requirements.txt` → `python -m playwright install chromium`.
 | `python test_browser_identity.py` | identity (offline) | **207/207 passed** |
 | `python test_thread_scheduler.py` | runtime (offline) | **93/93 passed** |
 | `python test_mock_chitchat.py` | mock site + session import + debug layer | **54/54 passed** |
-| `python3 tools/e2e_mock_chat.py` | **real browser E2E** | **PASS** (see v2.7 below) |
+| `python test_ws_transport.py` | chat WebSocket (Engine.IO v4 + Socket.IO) | **50/50 passed** |
+| `python3 tools/e2e_mock_chat.py` | **real browser E2E** (DOM transport) | **PASS** (see v2.7 below) |
+| `python3 tools/e2e_mock_chat.py --transport ws` | **real browser E2E** (socket transport) | **PASS** (see v2.8 below) |
 | `python tools/live_chat.py` | flow (default) | interactive REPL |
 
 ## Project layout
@@ -318,6 +320,94 @@ python entry\main.py
 
 `EVA_CHROMIUM_EXTRA_ARGS` appends extra launch flags (e.g. `--no-sandbox` in
 containers).  Both are optional; without them the bot behaves as before.
+
+## Chat over the live WebSocket (v2.8 — "imporve web socket")
+
+The chat now works the way the site itself works: after the saved session is
+restored, the bot connects to the account's own chat socket and reads/writes the
+conversation there — no DOM polling for the messages and no typing for the reply.
+
+```
+wss://api.chitchat.gg/socket.io/?EIO=4&transport=websocket
+  0{…}            ← engine.io handshake (ping 25 s)
+  40{release}     → handshake with the site's release id
+  ← 40{sid,pid}      the pid is the account's own profile id
+  → 42["presenceSync"]
+  ← 42["matchUpdate", {match:{conversation:{…}}}]     the chat to talk in
+  ← 42["chatMessage", {message:{author, content}}]    incoming SMS
+  → 42["<send event>", {conversationId, content}]     our reply
+  ← 42["chatMessage", …]                              the server echo = delivered
+```
+
+The full capture (frames, payloads, the closure frame) is written down in
+`docs/WS_CHAT_PROTOCOL.md`.
+
+| File | Role |
+|------|------|
+| `core/socketio.py` | Engine.IO v4 + Socket.IO client, stdlib only (no new dependency for the Windows build), auto-reconnect + heartbeat |
+| `core/chat_ws.py` | chat layer: session cookies, `matchUpdate`/`chatMessage`, echo-confirmed sending, bundle probe |
+| `tools/ws_chat.py` | CLI to listen/reply/probe an account's socket |
+| `tools/session_chat.py --transport ws` | the backend runner: browser holds the session, the socket does the chatting |
+| `tools/mock_chitchat/ws_server.py` | offline stand-in that speaks exactly those frames |
+
+```bash
+# backend runner over the socket (headless by default)
+python tools/session_chat.py --account sadia.6.7@gmail.com --transport ws --minutes 30
+
+# watch a session's socket, or answer with ChatRuleBot
+python tools/ws_chat.py --account sadia.6.7@gmail.com --listen
+python tools/ws_chat.py --account sadia.6.7@gmail.com --reply
+python tools/ws_chat.py --account EMAIL --send "hi"        # one message
+python tools/ws_chat.py --account EMAIL --reply --probe    # learn the send event
+
+# protocol report from a HAR capture / from a saved JS bundle
+python tools/ws_chat.py --har ws.txt
+python tools/ws_chat.py --bundle js-direct-chat.js
+```
+
+**The send event name.** The capture does not contain the client frame that sends
+a message (the message was typed before the capture started), so the bot resolves
+it in this order: `--ws-send-event` / `data/ws_config.json` → `--probe` (reads
+the event names out of the site's own chat bundle) → the default candidate list →
+and in every case **delivery is only accepted when the server echoes the message
+back** (`[WS] ✓ delivery confirmed by the server echo`). If nothing is confirmed,
+`run_account_ws` falls back to typing in the page (`--no-dom-fallback` disables
+that), so a chat is never lost.
+
+`--transport dom` (the default) is unchanged: the DOM flow from v2.2–v2.7 still
+runs exactly as before.
+
+### Proving it offline (`--transport ws`)
+
+```bash
+python3 tools/e2e_mock_chat.py --transport ws --minutes 1.0
+```
+
+Same real pipeline (real Chromium, the account's profile, the saved cookies, the
+stealth layer, `ChatRuleBot`), but the stand-in now also runs the chat socket:
+**both** the bot's backend client **and** the two browser pages talk Engine.IO
+v4 + Socket.IO to it.  The added checks:
+
+| Check | What it proves |
+|-------|----------------|
+| engine.io + socket.io handshake completed | real socket, real frames |
+| the restored session cookies went out on the socket handshake | the socket is authenticated by `storage_state.json` (cookie/token only) |
+| the account identity came from its own session (pid match) | `40{pid}` ↔ `matchUpdate` participants |
+| incoming SMS was read from `chatMessage` events | detection is socket-side, not DOM |
+| the reply was confirmed by the server echo | the reply really left the bot over the socket |
+| no DOM fallback was needed | the reply was not typed into the page |
+| the chat closure travelled over the socket | `closure{closed:true}` handling |
+
+The run also writes `ws_transcript.json` (every frame the stand-in sent, the
+cookie names on the handshake, the transcript) next to the other artifacts.
+
+On a sandbox where the mock pages are served over `https` but the stand-in
+listens on `127.0.0.1`, the harness starts Chromium with
+`--unsafely-treat-insecure-origin-as-secure=http://127.0.0.1:<port>
+--disable-features=LocalNetworkAccessChecks,BlockInsecurePrivateNetworkRequests`
+and grants the `local-network-access` permission to the context.  That is a
+test-harness detail for the local stand-in only — the real bot always dials
+`wss://api.chitchat.gg`.
 
 ## Separate Chrome profile per account (v2.5 — "প্রতিটা account এর আলাদা profile + fingerprint")
 

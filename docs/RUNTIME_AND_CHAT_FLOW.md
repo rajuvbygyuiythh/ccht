@@ -228,3 +228,54 @@ python tools/session_chat.py --all --plan-only
 | `test_chat_detect.py` / `test_selector_doctor.py` | DOM detection + self-heal |
 
 চালান: `python test_thread_scheduler.py` · `python tools/thread_planner.py --simulate`
+
+---
+
+## Part 3 — WebSocket transport: session → socket → SMS detect → reply (v2.8)
+
+`--transport ws` দিলে DOM-এর বদলে **site-এর নিজের socket** দিয়ে chat হয়। browser
+তখন শুধু session ধরে রাখে (profile + cookies + fingerprint আগের মতোই), আর
+message পড়া/পাঠানো হয় Engine.IO v4 + Socket.IO ফ্রেমে — capture করা protocol:
+`docs/WS_CHAT_PROTOCOL.md`।
+
+```
+ [Restore] saved session verified ──────► browser-এ cookies/logged-in state
+        │ ⑩ context.cookies() → Cookie header (token সহ)
+        ▼
+ [WS] connect wss://api.chitchat.gg/socket.io/?EIO=4&transport=websocket
+        │      0{…} ← handshake        → 40{release}      ← 40{sid,pid}
+        │      → 42["presenceSync"]    ← 42["matchUpdate", {match:{conversation}}]
+        ▼
+ [WS] match ready (conversation id + participants)
+        │ ⑪ প্রতি incoming frame:
+        ▼
+ [SMS]  42["chatMessage", {message:{author, content}}] ─► ChatRuleBot.reply()
+        │ ⑫ reply = socket emit (আগে configured/probed event name)
+        ▼
+ [REPLY] 42["<send event>", {conversationId, content}]
+        │      server echo (42["chatMessage", …]) = delivery confirmed
+        ▼
+ fallback: echo না এলে page-এ টাইপ করা হয় (DOM path) — chat হারায় না
+```
+
+| ধাপ | ফাইল / ফাংশন |
+|---|---|
+| ⑩ cookies → header | `core/chat_ws.py` → `cookies_header()`, `load_session_cookies()` |
+| ⑪ socket + frames | `core/socketio.py` → `SocketIOClient` (stdlib only, auto-reconnect, ping/pong) |
+| ⑫ message parse | `core/chat_ws.py` → `ChatWebSocket._handle_match()`, `_handle_message()` |
+| ⑬ reply + echo confirm | `ChatWebSocket.send_message()` (echo = delivery proof) |
+| ⑭ send event name | `data/ws_config.json`, `--ws-send-event`, `probe_send_events_from_page()` |
+| ⑮ backend runner | `tools/session_chat.py` → `run_account_ws()` (`--transport ws`) |
+| ⑯ manual CLI | `tools/ws_chat.py` (`--listen/--send/--reply/--probe/--har`) |
+
+চালানো:
+
+```bat
+python tools\session_chat.py --account EMAIL --transport ws --minutes 30
+python tools\ws_chat.py --account EMAIL --listen
+python tools\ws_chat.py --account EMAIL --reply --probe
+```
+
+পরীক্ষা: `python test_ws_transport.py` (50/50) + `python3 tools/e2e_mock_chat.py
+--transport ws` (real browser E2E, socket transport — check list README v2.8-এ)।
+
