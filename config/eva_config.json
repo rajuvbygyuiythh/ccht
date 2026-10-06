@@ -1,0 +1,261 @@
+{
+  "intents": {
+    "greeting": {
+      "priority": 15,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "farewell": {
+      "priority": 10,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "how_are_you": {
+      "priority": 12,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "age_question": {
+      "priority": 20,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "name_question": {
+      "priority": 20,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "location_question": {
+      "priority": 20,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "gender_question": {
+      "priority": 20,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "compliment": {
+      "priority": 18,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "flirt": {
+      "priority": 22,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "horny": {
+      "priority": 25,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "sexting": {
+      "priority": 25,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "snap_request": {
+      "priority": 22,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "social_media": {
+      "priority": 20,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "relationship": {
+      "priority": 18,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "hobby": {
+      "priority": 15,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "food": {
+      "priority": 15,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "music": {
+      "priority": 15,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "daily_routine": {
+      "priority": 12,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "feelings": {
+      "priority": 10,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "confused": {
+      "priority": 8,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "thanks": {
+      "priority": 12,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "objection": {
+      "priority": 15,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "english_only": {
+      "priority": 5,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "reaction": {
+      "priority": 8,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "goodmorning": {
+      "priority": 15,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    },
+    "who_are_you": {
+      "priority": 14,
+      "weight": 1.0,
+      "enabled": true,
+      "min_confidence": 0.3,
+      "max_responses_per_session": 10,
+      "tags": []
+    }
+  },
+  "session": {
+    "max_duration_minutes": 30,
+    "max_messages": 100,
+    "auto_cleanup": true,
+    "save_history": true,
+    "track_metrics": true
+  },
+  "memory": {
+    "max_history": 50,
+    "extract_entities": true,
+    "track_mood": true,
+    "track_topics": true,
+    "sentiment_analysis": false
+  },
+  "responses": {
+    "greeting": {
+      "templates": [
+        "hey {name}!",
+        "hi {name}!",
+        "heyy {name}!",
+        "hey! how are u?",
+        "hi there!"
+      ],
+      "min_length": 5,
+      "max_length": 200,
+      "allow_custom": true,
+      "fallback": [
+        "hey",
+        "hi",
+        "hello"
+      ]
+    },
+    "farewell": {
+      "templates": [
+        "bye {name}!",
+        "see ya!",
+        "talk later!",
+        "take care!"
+      ],
+      "min_length": 5,
+      "max_length": 200,
+      "allow_custom": true,
+      "fallback": [
+        "bye",
+        "see ya",
+        "later"
+      ]
+    }
+  }
+}

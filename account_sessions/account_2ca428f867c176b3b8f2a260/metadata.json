@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "account_key": "2ca428f867c176b3b8f2a260",
+  "email": "darkperch655@myerly.com",
+  "account_type": "login_account",
+  "saved_at": "2026-09-08T18:59:43.612467+00:00",
+  "restore_url": "https://app.chitchat.gg/start/new",
+  "storage_state": "storage_state.json",
+  "fingerprint": "fingerprint.json",
+  "history": "history.json",
+  "proxy": null,
+  "last_url": "https://app.chitchat.gg/chat/new/6aa059d5dfd8e17c0ef86d39"
+}

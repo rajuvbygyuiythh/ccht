@@ -1,0 +1,397 @@
+================================================================================
+EVA BOT — INFO.TXT (BANGLA GUIDE)
+Bot kivoabe kaj kore, kon SMS pele kon file theke reply ashe — sob A to Z.
+================================================================================
+
+■ PART 1 — MOROL BHAB (মূল কথা)
+--------------------------------------------------------------------------------
+Ei bot er 2 ta folder shob kichhu:
+
+    data/input/   = USER ki bole (SMS / keyword / trigger)  <- ekhane LIKHEN
+    data/output/  = BOT ki reply korbe                       <- ekhane REPLY
+
+NIYOM: input er jegulo file, output e OI SAME NAAM er file theke reply ashe.
+
+    UDAHARON (example):
+    -------------------
+    user lekhe:  "m 21"
+    bot check kore:  input/age_gender.txt  er shob line er shathe "m 21" mille kina
+    mille:           category = age_gender
+    bot reply dey:   output/age_gender.txt  er jekono ekta line theke
+                     (jemon: "f19", "f 20", "20f"...)
+
+    Mane:  input/age_gender.txt  +  output/age_gender.txt  = EKTA CATEGORY.
+
+Ei niyome PROTHOM e input er SHOB txt file er shob line search kore user er
+SMS er shathe mile deya hoy. Jodi match hoy -> category detect hoy ->
+logic rules apply hoy -> output er SAME category file theke reply ashe.
+
+
+■ PART 2 — FLOW (BOT ER PURA CHALANO MARGO)
+--------------------------------------------------------------------------------
+Bot er conversation e 5 ta stage ache, ekta er por ekta:
+
+    STAGE 1: NEW (notun chat shuru)
+        user er FIRST SMS:
+        - "hi / hey / hlw"        -> output/greeting.txt            theke reply
+        - "m21" (age/gender)      -> output/age_gender.txt          theke reply
+        - "where u from?"         -> output/country.txt             theke reply
+
+    STAGE 2: WAIT_AGE_GENDER (bot age/gender er待 jonne)
+        - user "m 21 / f19 / 22m" -> output/age_gender.txt          theke reply
+        - user onno kichu bole    -> output/age_ask.txt             theke reply
+          (bot abar age jiggayesh kore)
+        - 2 bar answer na dile bot nijei country niye kotha shuru kore:
+                                   -> output/country.txt            theke reply
+
+    STAGE 3: WAIT_COUNTRY (country er jonne)
+        - user "where u from?"    -> output/country.txt             theke reply
+          (bot nijer country bole, jemon "uk wbu")
+        - user country bole ("usa", "germany"...) 
+                                   -> output/flirty_questions.txt    theke reply
+          (bot country dhore rakhe, tarpor flirty question chare)
+
+    STAGE 4: MIDDLE (cholar math) — EKHANE "DETECT NEXT USER MSG":
+        prottek SMS age check hoy:
+        (a) USER SNAP MAGBE? ("ur sc?", "whats ur snap", "snap?")
+              YES -> output/share_snap.txt theke snap share -> END CHAT
+              (eta bot er ask er opekkha kore na — user nijei chay)
+        (b) BOT ER ASK er JAWAB "yes" type? ("yes", "yeop", "sure"...)
+              YES (bot age ASK korechilo) 
+                                   -> output/share_snap.txt theke share -> END
+              (bot ASK na korle "yes" maane normal answer — share HOY NA!)
+        (c) HORNY keyword? ("u horny?", "nudes", "sex"...)
+              YES -> output/horny.txt                             theke reply
+              (tar por BOT ER PORER MESSAGE = ASK SNAP)
+        (d) FLIRTY keyword? ("ur cute", "love", "kiss", "u single"...)
+              YES -> output/middle_chat/flirty_reply.txt           theke reply
+              (tar por BOT ER PORER MESSAGE = ASK SNAP)
+        (e) "how are u"          -> output/how_are_you.txt          theke reply
+        (f) "how old are u"      -> output/your_age.txt             theke reply
+        (g) onno bhasha (hola...) -> output/english_only.txt         theke reply
+        (h) abar "hi"            -> output/greeting.txt             theke reply
+        (i) "gtg / bye / brb"    -> output/middle_chat/busy_later.txt theke reply
+        (j) choto reaction "lol / ok / nice"
+                                -> output/middle_chat/warm_reply.txt theke reply
+        (k) KICHUI match na korle -> output/flirty_questions.txt     theke reply
+            (bot notun flirty question chare, chat chaliye jay)
+
+    HORNY QUESTION (user bot ke DIRECT question kore — 2 LINE REPLY):
+        user: "horny?" / "hrny?" / "are u horny?" / "rn horny?" / "u dtf?"
+        (middle chat BA chat er 1-3 line — JEKONO jaygay kaj kore)
+        bot LINE 1: output/horny_answer.txt theke yes-type ans
+                    ("yes", "yep", "yes very", "so much", "yeppp", "yeahh")
+        bot LINE 2: output/horny.txt theke random line
+        tarpor ager motoi: user ja-i bole na keno -> ask_snap.txt
+        -> positive -> share_snap.txt -> END
+        NOTE: question na hole (statement jemon "im horny", "send nudes")
+        ager moto SINGLE line horny.txt theke reply ashe — change hoy nai.
+        (input/horny_answer.txt e question trigger gulo edit kora jay)
+
+    ASK SNAP STEP (snap share er AGE — notun rule):
+        horny reply ba flirty_reply er PORER bot message e bot
+        output/ask_snap.txt theke jiggesh kore ("u got snp?", "add my snp?")
+        -> user "yes / yeop / sure" bole   -> output/share_snap.txt -> END
+        -> user "no / nope" bole          -> output/retry_nudge.txt (1 bar)
+           (abar "no" bole               -> output/closer.txt -> CHAT SHESH)
+        MANE: share hote hole bot AGE ask korbe, tarpor user yes bolle
+        share — "yes" ekbare bocca kore share kore na (ei bug fix kora hoyeche)
+
+    STRICT RULE (horny chain — user ki bole dekhar dorkar NEI):
+        user horny detect holo  -> horny.txt theke 1 line reply
+        porer user message      -> JA-I bole na keno, ask_snap.txt theke
+                                   bot snap jiggesh korbe
+        tarpor positive hole    -> share_snap.txt -> CHAT/SESSION SHESH
+        (positive mane: yes, ok, k, yes i got, @, share me,
+         whats ur snap/sc/user, yeop, sure, drop it, add me...)
+
+    STAGE 5: END
+        - snap share hoye gele   -> CHAT SHESH
+        - bot 8 ta reply dile    -> output/closer.txt                theke reply
+                                    ("ttyl, snap me 👻") -> CHAT SHESH
+
+
+■ PART 3 — CATEGORY LIST (KON SMS -> KON INPUT -> KON OUTPUT)
+--------------------------------------------------------------------------------
+SL  USER ER SMS (EXAMPLE)            INPUT FILE (trigger)        OUTPUT FILE (reply)
+--  ------------------------------    -------------------------   ----------------------
+01  hi, hey, hlw, hii                input/greeting.txt          output/greeting.txt
+02  m21, m 21, 20m, f 19             input/age_gender.txt        output/age_gender.txt
+03  where u from? from?              input/country.txt           output/country.txt
+04  how are u, hru, wbu              input/how_are_you.txt       output/how_are_you.txt
+05  how old are u, ur age?           input/your_age.txt          output/your_age.txt
+06  hola, como estas (Spanish...)    input/english_only.txt      output/english_only.txt
+07  u horny?, nudes, sex, send pic   input/horny.txt             output/horny.txt
+07b horny?/hrny?/are u horny? (Q)   input/horny_answer.txt      output/horny_answer.txt
+    (DIRECT question hole 2 line: yes-type ans + horny.txt line)
+08  ur cute, love u, kiss, single    input/middle_chat/          output/middle_chat/
+                                       flirty_reply.txt            flirty_reply.txt
+09  lol, ok, nice, cool, idk         input/middle_chat/          output/middle_chat/
+                                       warm_reply.txt              warm_reply.txt
+10  gtg, bye, brb, sleepy, tired     input/middle_chat/          output/middle_chat/
+                                       busy_later.txt              busy_later.txt
+11  ur sc?, ur snap?, whats ur snap  input/share_snap.txt        output/share_snap.txt
+    (user NIJE snap magle -> SHARE + END)
+    [note: "yes/yeop" khudro share hoy BOT ER ASK er pore — niche dekho]
+12  my snap is..., add me on snap    input/snapchat.txt          output/snapchat.txt
+                                   (user nijer snap dey -> bot share kore -> END)
+
+NOTE (bot nijer icchay pathay, user trigger lage NA — automatic):
+    output/flirty_questions.txt  - country answer/na bujhle flirty question
+    output/ask_snap.txt          - horny/flirty reply er POROBORTI message e
+                                    bot snap jiggesh kore ("u got snp?")
+    output/retry_nudge.txt       - ask er por user "no" bole (1 bar nudge)
+    output/age_ask.txt           - age jiggesh korar reply
+    output/closer.txt            - chat shesh korar reply ("ttyl, snap me 👻")
+
+SPARE file (ekhon flow te nai, kinto rakha ache):
+    output/ask_snap_backup.txt, gender_ask.txt, answer_ack.txt,
+    agreement_ack.txt, agreement_breaker.txt, answer_followup.txt,
+    info_ack.txt, middle_chat/new_topic.txt
+
+
+■ PART 4 — MATCHING SYSTEM (EKTA FAIL KORLE AREKTA KAJ KORE)
+--------------------------------------------------------------------------------
+User er SMS gulo 4 VABE match kora hoy (prottekta layer ekta er por chole):
+
+    LAYER 1: EXACT match
+        user: "hi"  ==  input/greeting.txt er line "hi"  -> MATCH
+
+    LAYER 2: SUBSTRING match (word-boundary)
+        user: "heyy there"  er moddhe  "heyy"  ache  -> MATCH
+
+    LAYER 3: SLANG-NORMALIZED match (slang expand kore)
+        user: "wats ur age?"  ->  "what is your age?"  hoye jay
+        -> input er "what is your age" line er shathe MATCH
+
+    LAYER 4: TOKEN-SUBSET match (word order jai hok)
+        trigger: "how are you"  (3 ta word)
+        user: "you how are" / "how are you doing rn"  -> sob word thakle MATCH
+
+    LAYER 5: SMART fallback (txt file chara oivabe kaj kore):
+        - "m 21" type pattern REGEX diye dhora hoy (input file lage na)
+        - country naam dhora hoy  data/countries.txt  theke
+        - "ur sc?" / "snap?" type positive pattern REGEX diye dhora hoy
+
+    LAYER 6: LEET/OBFUSCATED detect (advance — horny):
+        - "h0rny" (zero diye), "s3x", "n0des", "f*ck", "dtf", "18+"
+          type lekhao bot dhore fele (REGEX layer)
+
+ETA mane: apni input file e keyword add korle bot 5+ vabe bujhte try korbe.
+Ekta method fail korle arekta method e match khuje pabe.
+
+
+■ PART 5 — KIVABE CUSTOMIZE KORBEN (STEP BY STEP)
+--------------------------------------------------------------------------------
+KAJ 1: NOTUN KEYWORD / TRIGGER ADD KORA
+    1. dhore nen user era "sup boi" likhle bot ki dibe
+    2. data/input/greeting.txt file ta khulen (notepad e)
+    3. shesh e notun line likhen:  sup boi
+    4. save korun. HOYE GELO! Ekhon "sup boi" likhle bot greeting reply dibe.
+
+KAJ 2: NOTUN REPLY ADD KORA
+    1. data/output/greeting.txt khulen
+    2. notun line likhen (1 line = 1 reply):  yoo stranger
+    3. save. Ekhon bot mone mone ei reply ta o use korbe.
+
+KAJ 3: EKDOM NOTUN CATEGORY BANANO (new topic!)
+    1. data/input/ music.txt  banan (trigger:  fav song?, music?)
+    2. data/output/music.txt  banan (reply:   i love pop, u?)
+    3. EKHONI kaj korbe — kono code change lage na!
+       ("fav song?" likhle bot "i love pop" type reply dibe)
+
+KAJ 4: COUNTRY ADD KORA
+    1. data/countries.txt khulen
+    2. line likhen:  bharat=india
+    3. save. Ekhon user "bharat" likhle bot country=india dhore
+
+KAJ 5: SNAP USERNAME CHANGE
+    1. data/snap_ids.txt — ekhane 1 line e 1 username
+    2. bot share korte hole round-robin e ekta ekta kore use hobe
+
+NOTE:
+    - input file e "#" diye line shuru korle seta COMMENT (bot ignore kore)
+    - output file er PROTTEK LINE ekta reply — # comment kaj kore NA ekhane
+    - 1 reply 1 line e likhben, duita reply ek line e na
+
+
+■ PART 6 — PLACEHOLDER (REPLY LINE ER BITORER CODE)
+--------------------------------------------------------------------------------
+output file er reply line e likhley bot auto-replace kore dey:
+
+    %username%   -> snap username (data/snap_ids.txt theke)
+                    jemon: "add me %username%"  ->  "add me dumpqu"
+    {snap}       -> same as %username%
+    {country}    -> user er country (jodi dhora thake)
+                    jemon: "{country} is dope"  ->  "usa is dope"
+
+
+■ PART 7 — ARO NIYOM (BOT ER BEHAVIOR RULES)
+--------------------------------------------------------------------------------
+1. NO REPEAT (LINE): ekta conversation e bot kokhono same LINE 2 bar bole na
+   (pool shesh hole abar shuru hoy)
+2. NO REPEAT (TXT FILE) — SOHOJ RULE: ekta output txt file theke bot
+   ekbar reply dile, OI user ke AIKONO abar same txt file theke reply
+   dey NA! (greeting 1 bar, age_gender 1 bar, country 1 bar,
+   warm_reply 1 bar, how_are_you 1 bar...)
+   EXCEPTION (ei 4 ta file BAR BAR use hoy — kintu PROTTEKBAR DIFFERENT
+   LINE, same line kokhono na):
+     - flirty_questions.txt (funnel chalate)
+     - horny.txt           (jokhon-i horny detect hobe -> notun line)
+     - middle_chat/flirty_reply.txt (jokhon-i flirty detect hobe -> notun line)
+     - ask_snap.txt        (repeat detect er por abar jiggesh -> notun line)
+   Ete context vul hoy na — age jake "f20" bolechi, abar bole na.
+   AR RE-ASK LOOP: user barbar horny/flirty thakle bot barbar
+   horny/flirty_reply (notun line) -> ask_snap (notun line) cycle chalabe,
+   positive paowar por share -> END.
+3. REPLY CAP: bot max 8 ta reply dey, tarpor closer.txt bole chat shesh
+   (change korte chaile: environment variable EVA_MAX_REPLIES=10)
+4. UNDERAGE BLOCK: user jodi 18 er choto age bole (jemon "m15"),
+   bot KOKHONO snap share kore na — polite bhabe chat shesh kore
+5. MEMORY (line by line): user er prottek SMS + bot er prottek reply
+   number soho mone rakha hoy (transcript). Bot jane age ki bola hoyeche
+   — tai kono kotha repeat hoy na, context bujhe reply dey.
+6. ASK BEFORE SHARE: bot snap share korar AGE output/ask_snap.txt theke
+   jiggesh kore ("u got snp?"). "yes/yeop" bolele tarpor share hoy.
+   User nijei snap magle ("ur sc?") — sathe sathe share hoy.
+   User "no" bole -> retry_nudge.txt (1 bar) -> abar "no" bole ->
+   closer.txt diye polite bhabe chat shesh.
+7. MULTI-LINE SMS: user duita line e pathakle shesh line ta process hoy
+8. RANDOM PICK: same category theke random line ashe, tai prottekbar alada
+   reply mone hoy
+
+
+■ PART 8 — TEST / CHALANOR NIOM
+--------------------------------------------------------------------------------
+    python3 test_flow.py     <- 40+ check test (sob PASS hote hobe)
+    python3 demo_flow.py     <- script diye pura flow dekhay
+    python3 run_chat.py      <- apni nije bot er shathe chat korun
+                                (/new = notun chat, /state = state dekhen,
+                                 /debug = trace on/off, /quit = ber hoy)
+    python3 eva_flow.py      <- quick self-test
+
+DEBUG: run_chat.py e prottek reply er niche dekhabe:
+    eva> wanna deep dive with me
+         # flirty_questions.txt line 399  [stage=MIDDLE] ...
+    mane: reply ta flirty_questions.txt file er 399 number line theke esheche.
+
+
+■ PART 9 — FOLDER STRUCTURE (PURA PICTURE)
+--------------------------------------------------------------------------------
+data/
+├── input/                          <- USER SMS TRIGGER (apni edit korun)
+│   ├── greeting.txt                hi, hey, hlw...
+│   ├── age_gender.txt              m21, m 21, 20m...
+│   ├── country.txt                 where u from?, from?...
+│   ├── how_are_you.txt             how are u, hru...
+│   ├── your_age.txt                how old are u, ur age?...
+│   ├── english_only.txt            hola, como estas... (onno bhasha)
+│   ├── horny.txt                   u horny?, nudes, sex... (sob horny)
+│   ├── horny_answer.txt            horny?, hrny?, are u horny?... (DIRECT question)
+│   ├── share_snap.txt              yes, yeop, ur sc?, whats ur snap...
+│   ├── snapchat.txt                my snap is, add me on snap...
+│   └── middle_chat/
+│       ├── flirty_reply.txt        ur cute, love u, kiss, single...
+│       ├── warm_reply.txt          lol, ok, nice, cool, idk...
+│       └── busy_later.txt          gtg, bye, brb, sleepy...
+│
+├── output/                         <- BOT REPLY (apni edit korun)
+│   ├── greeting.txt                bot er greeting reply
+│   ├── age_gender.txt              "f19", "f 20"...
+│   ├── country.txt                 "uk wbu", "from wales wby?"...
+│   ├── how_are_you.txt             bot er "how are u" reply
+│   ├── your_age.txt                "21", "im 20"...
+│   ├── english_only.txt            "sorry i only speak english"...
+│   ├── horny.txt                   "maybe 🥵", "oh 😳", "haha calm downnn"...
+│   ├── horny_answer.txt            "yes", "yep", "yes very", "so much"... (question er ans)
+│   ├── share_snap.txt              snap share line (%username% soho)
+│   ├── snapchat.txt                "Added you on snap %username%"...
+│   ├── flirty_questions.txt        flirty question pool
+│   ├── ask_snap.txt                bot er snap jiggesh ("u got snp?")
+│   ├── retry_nudge.txt             ask er por "no" bole nudge (1 bar)
+│   ├── age_ask.txt                 "how old r u?" type ask
+│   ├── closer.txt                  END CHAT line ("ttyl, snap me 👻")
+│   ├── info.txt                    <- EI FILE (guide)
+│   ├── middle_chat/
+│   │   ├── flirty_reply.txt        "hehe you're cute tho 😏"...
+│   │   ├── warm_reply.txt          "lol okay", "ah nicee"...
+│   │   └── busy_later.txt          "aw okay, hmu later"...
+│   └── (spare: ask_snap.txt, gender_ask.txt, answer_ack.txt, ...)
+│
+├── snap_ids.txt                    <- snap username list (round-robin)
+├── snap_ids_fallback.txt           <- snap username backup
+└── countries.txt                   <- country keyword=country list
+
+================================================================================
+SOMOHOJE MONE RAKHUN:  INPUT = user er kotha |  OUTPUT = bot er kotha
+SAME NAAM = SAME CATEGORY.  Ek line add korlei change hoye jay. Happy customizing!
+================================================================================
+
+================================================================================
+TROUBLESHOOTING — "bot user er SMS detect korte parche na"
+================================================================================
+Bot je user der sathe chat kore, tar SMS gulo browser theke porar kaj kore
+browser/chat_reader.py. Site er HTML class change hoye gele age bot chup
+kore boshe thakto (error dekhato na, reply o ditona).
+
+Ekhon ki hoy:
+  1. Ekta noy — onek gulo selector try kore (age jeta chilo, seta soho).
+  2. Nijossho message abar count hoy na (double counting bondho).
+  3. Speaker bujhe: sidebar username, row alignment (justify-end etc.),
+     ar "ei text ta ami ekhon pathalam" — nijer bubble ke reply kore na.
+  4. Layout ekdom notun hole "Name: message" line diye SMS ber kore.
+  5. New SMS dhora hoy fingerprint diff diye (age counter DOM er cheye
+     agegiye jeto, tai SMS dekha jeto na — shei bug fix).
+  6. 0 ta message porle log e WARNING dey + kon selector try korechilo bole dey.
+
+Kivabe debug korben (login lagbe na):
+  * Chat page browser e khulun -> right-click -> Save as -> "Webpage, HTML only"
+  * Tarpor:   python tools/chat_detect_debug.py --html path\to\chat_page.html
+  * Live URL diyeo chalate paren: python tools/chat_detect_debug.py --url https://chitchat.gg/
+  * Bot chalate giye HTML save korte chan?  EVA_DUMP_CHAT_DOM=1 set korun —
+    logs/chat_dom_dump_*.html file toiri hobe.
+
+Test:  python test_chat_detect.py     (47 ta check)
+================================================================================
+
+================================================================================
+NOTUN — SITE ER DESIGN CHANGE HOLE BOT NIJEI THIK KORE NEY (v2.3)
+================================================================================
+Chitchat.gg kokhono kokhono nijer HTML/class bodle dey. Age seta hole bot
+"andha" hoye jeto (SMS dekhto na, reply ditona). Ekhon 3 ta layer ache:
+
+  1. RUNTIME SELF-HEALING (nijei kore, kichu korte hobe na)
+     * Built-in selector gulo kono ekta na mille, bot page tar markup
+       porikkha kore nijei notun selector ber kore ney
+       (browser/selector_doctor.py), sei selector diye SMS pore, ar
+       porer poll theke seta mone rakhe.
+     * Log e dekhabe:  [Detect] chat markup CHANGED — the bot healed itself
+     * Bhalo kore kaj korte thakle ki hoyeche jante parben:
+         logs/selector_suggestion_*.json  file ta save hoy — oi file ta
+         dekhle bujhben kon selector dhora poreche.
+
+  2. NIJE HATE KORBEN (recommended — permanent fix)
+     * Chat page browser e khulun -> right-click -> Save as ->
+       "Webpage, HTML only"  -> dhoren chat_page.html
+     * Tarpor:
+         python tools/chat_detect_debug.py --html chat_page.html --suggest
+             -> bot ki ki porte parche + notun selector gulo dekhabe
+         python tools/chat_detect_debug.py --html chat_page.html --explain
+             -> kon candidate kothay theke elo, score koto
+         python tools/chat_detect_debug.py --html chat_page.html --save
+             -> config/chat_selectors.json e likhe dibe (code change lagbe na!)
+         python tools/chat_detect_debug.py --html chat_page.html --offline --suggest
+             -> Playwright/node kichu na thakle o cholbe (khali standard library)
+     * config/chat_selectors.json muche dile abar purono built-in selector e
+       fire jabe. Backup thake: chat_selectors.json.bak
+
+  3. AUTOMATIC SAVE (chaile)
+     * EVA_SELECTOR_AUTOSAVE=1 set korle runtime e je selector pay, seta nijei
+       config/chat_selectors.json e likhe rakhbe.
+     * Onno kono path e config rakhben?  EVA_CHAT_SELECTORS=C:\path\file.json
+
+  Ekti bipod noy: page ekta chat page na hole (landing page, sidebar menu,
+  article) bot kichu "guess" kore reply kore na — doctor shei page gulo
+  reject kore dey. Test: python test_selector_doctor.py  (105 ta check)
+
+================================================================================

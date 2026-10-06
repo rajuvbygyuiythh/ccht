@@ -1,0 +1,37 @@
+{
+  "generated": null,
+  "observed": {
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "app_version": "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "platform": "Win32",
+    "vendor": "Google Inc.",
+    "language": "en-US",
+    "languages": [
+      "en-US",
+      "en"
+    ],
+    "hardware_concurrency": 8,
+    "device_memory": 8,
+    "max_touch_points": 0,
+    "webdriver": false,
+    "timezone": "America/New_York",
+    "screen": {
+      "width": 1600,
+      "height": 900,
+      "avail_width": 1600,
+      "avail_height": 860,
+      "color_depth": 24,
+      "pixel_depth": 24
+    },
+    "viewport": {
+      "width": 1565,
+      "height": 764,
+      "device_pixel_ratio": 1.5
+    },
+    "webgl": {
+      "vendor": "Google Inc. (Intel)",
+      "renderer": "ANGLE (Intel, Intel(R) UHD Graphics 770 (0x0000A780) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    },
+    "canvas_hash": "688522936"
+  }
+}

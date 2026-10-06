@@ -1,0 +1,32 @@
+{
+  "_note": "EXAMPLE ONLY - the bot reads config/chat_selectors.json (this .example file is ignored). Write yours with:  python tools/chat_detect_debug.py --html <saved chat page.html> --save   -- Custom selectors are tried BEFORE the built-in list; delete the file to go back to the defaults. Keys may be snake_case (my_usernames) or camelCase (myUsernames).",
+  "learned_at": "2026-01-01 00:00:00",
+  "source": "selector_doctor",
+  "confidence": 0.78,
+  "containers": [
+    "div.chat-scroll",
+    "[role='log']"
+  ],
+  "items": [
+    "div.chat-row",
+    "[data-testid^='message-row-']"
+  ],
+  "texts": [
+    "div.bubble-text",
+    "[data-testid='message-text']"
+  ],
+  "usernames": [
+    "span.name-tag"
+  ],
+  "my_usernames": [
+    "button span.user-nick"
+  ],
+  "own_hints": [
+    "justify-end",
+    "flex-end"
+  ],
+  "other_hints": [
+    "justify-start",
+    "flex-start"
+  ]
+}

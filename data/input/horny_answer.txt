@@ -1,0 +1,81 @@
+# ============================================================
+# HORNY QUESTION triggers — user DIRECT bot ke question kore
+# ("horny?", "hrny?", "are u horny?", "rn horny?", "u dtf?" ...)
+# middle chat BA chat er 1-3 line — JEKONO jaygay kaj kore.
+#
+# match hole bot 2 LINE pathay:
+#   line 1: output/horny_answer.txt theke yes-type ans
+#   line 2: output/horny.txt theke random line
+#   tarpor: ask_snap.txt -> positive -> share_snap.txt -> END
+#
+# notun question form add korte ekhane ekta line likhun.
+# (# diye shuru = comment, bot ignore kore)
+# ============================================================
+horny?
+horny ??
+horny ???
+hrny?
+hrony?
+hornyy?
+horney?
+horny rn?
+horny right now?
+horny or nah?
+horny or not?
+horny or what?
+horny asl?
+horny atm?
+horny af?
+h0rny?
+h0rny rn?
+rn horny?
+u horny?
+u horny rn?
+u horny atm?
+u horny rn or nah?
+u horny or nah?
+u horny or not?
+u horny or what?
+u horny asl?
+u horny af?
+u horny right now?
+u horny at all?
+u horny tonight?
+u hrny?
+u h0rny?
+r u horny?
+r u horny rn?
+r u horny right now?
+are u horny?
+are u horny rn?
+are you horny?
+are you horny rn?
+you horny?
+you horny rn?
+u feeling horny?
+feeling horny?
+u feeling it?
+u feelin it?
+u in the mood?
+in the mood?
+u in mood?
+u in the mood rn?
+u turned on?
+turned on?
+u turned on rn?
+u dtf?
+dtf?
+u down?
+down?
+u down rn?
+down rn?
+r u down?
+u wanna fun?
+wanna fun?
+wanna have fun?
+tryna fun?
+tryna have fun?
+u up for fun?
+u wet?
+wet?
+so wet?
