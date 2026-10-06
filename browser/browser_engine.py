@@ -37,6 +37,7 @@ Camoufox manager for Camoufox).  Callers should NEVER inspect it directly.
 from __future__ import annotations
 
 import os
+import json
 import sys
 from typing import Any, Dict, Optional, Tuple, Callable
 
@@ -102,22 +103,42 @@ _DEVICE_MEMORY_POOL = (4, 8, 8)
 #     reveal the real local/public IP (the #1 device-leak vector).
 #   * navigator.platform  — align with the UA (Win32 for Windows, MacIntel for
 #     macOS) so they don't contradict each other.
-def _build_stealth_init_script(ua: str, platform: str, hw_conc: int, dev_mem: int) -> str:
+def _build_stealth_init_script(ua: str, platform: str, hw_conc: int, dev_mem: int,
+                               metrics: Optional[Dict[str, Any]] = None) -> str:
+    """Build the anti-detect init script.
+
+    ``metrics`` carries the account's *permanent* device profile (screen size,
+    DPR, window metrics, locale).  When it is missing, values are randomized
+    per launch (the pre-Phase-14 behaviour).  Passing metrics is what keeps the
+    same account reporting the same screen/window size on every run — without
+    it, the same account looked like a different monitor every launch.
+    """
     import random as _r
-    screen_w = _r.choice([1366, 1440, 1536, 1600, 1920])
-    screen_h = _r.choice([768, 900, 864, 900, 1080])
-    avail_h = screen_h - _r.choice([40, 60, 80])
-    dpr = _r.choice([1.0, 1.0, 1.25, 1.5])
-    outer_w = screen_w + _r.randint(-50, 0)
-    outer_h = avail_h + _r.randint(-20, 0)
-    inner_w = outer_w - _r.randint(16, 40)
-    inner_h = outer_h - _r.randint(85, 140)
+    metrics = metrics or {}
+    screen = metrics.get("screen") or {}
+    viewport = metrics.get("viewport") or {}
+    outer = metrics.get("outer") or {}
+    inner = metrics.get("inner") or {}
+    languages = metrics.get("languages") or ["en-US", "en"]
+
+    screen_w = int(screen.get("width") or _r.choice([1366, 1440, 1536, 1600, 1920]))
+    screen_h = int(screen.get("height") or _r.choice([768, 900, 864, 900, 1080]))
+    avail_h = int(metrics.get("avail_height") or (screen_h - _r.choice([40, 60, 80])))
+    dpr = float(metrics.get("device_scale_factor") or _r.choice([1.0, 1.0, 1.25, 1.5]))
+    outer_w = int(outer.get("width") or (screen_w + _r.randint(-50, 0)))
+    outer_h = int(outer.get("height") or (avail_h + _r.randint(-20, 0)))
+    inner_w = int(inner.get("width") or viewport.get("width")
+                  or (outer_w - _r.randint(16, 40)))
+    inner_h = int(inner.get("height") or viewport.get("height")
+                  or (outer_h - _r.randint(85, 140)))
+    langs_json = json.dumps([str(lang) for lang in languages])
     return """
 (function () {
     const UA = %r;
     const PLAT = %r;
     const HW = %d;
     const MEM = %d;
+    const LANGS = %s;
 
     // ---- navigator.webdriver : the #1 headless tell ----
     try {
@@ -168,13 +189,13 @@ def _build_stealth_init_script(ua: str, platform: str, hw_conc: int, dev_mem: in
         });
     } catch (e) {}
 
-    // ---- navigator.languages : ['en-US', 'en'] (real user) ----
+    // ---- navigator.languages : the identity's locale (real user) ----
     try {
         Object.defineProperty(navigator, 'languages', {
-            get: () => ['en-US', 'en'], configurable: true
+            get: () => LANGS, configurable: true
         });
         Object.defineProperty(navigator, 'language', {
-            get: () => 'en-US', configurable: true
+            get: () => LANGS[0], configurable: true
         });
     } catch (e) {}
 
@@ -311,7 +332,7 @@ def _build_stealth_init_script(ua: str, platform: str, hw_conc: int, dev_mem: in
         }
     } catch (e) {}
 })();
-""" % (ua, platform, hw_conc, dev_mem,
+""" % (ua, platform, hw_conc, dev_mem, langs_json,
        screen_w, screen_h, screen_w, avail_h,
        dpr,
        outer_w, outer_h, inner_w, inner_h,
@@ -380,6 +401,8 @@ def launch_browser(
     log_fn: LogFn = None,
     fingerprint: Optional[Any] = None,
     firefox_prefs: Optional[Dict[str, Any]] = None,
+    persistent_dir: Optional[Any] = None,
+    context_kwargs: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Any, Any]:
     """Launch a browser and return ``(browser, handle)``.
 
@@ -396,8 +419,17 @@ def launch_browser(
         Optional logger ``fn(str)``.
     fingerprint : any
         Camoufox-only: a saved fingerprint to restore.  Ignored for Chromium.
+        (Chromium gets its device profile through ``context_kwargs``.)
     firefox_prefs : dict | None
         Camoufox-only: ``firefox_user_prefs`` overrides.  Ignored for Chromium.
+    persistent_dir : str | Path | None
+        Chromium-only: open a REAL persistent profile in this directory
+        (cookies, IndexedDB, cache and history survive between runs — the
+        "same browser" mode).  The returned ``browser`` object proxies
+        ``new_context()`` to that profile.
+    context_kwargs : dict | None
+        Chromium-only: extra ``new_context``/``launch_persistent_context``
+        options (UA, viewport, locale, timezone, ...).
 
     Returns
     -------
@@ -410,6 +442,9 @@ def launch_browser(
     if engine == "camoufox":
         return _launch_camoufox(headless, proxy, log_fn, fingerprint, firefox_prefs)
     # Default and recommended: Chromium
+    if persistent_dir:
+        return _launch_chromium_persistent(persistent_dir, headless, proxy, log_fn,
+                                           context_kwargs)
     return _launch_chromium(headless, proxy, log_fn)
 
 
@@ -479,6 +514,89 @@ def _launch_chromium(headless, proxy, log_fn):
     if log_fn:
         log_fn("[Browser] Chromium started successfully")
     return browser, handle
+
+
+class _PersistentProfile:
+    """Makes a Playwright *persistent* context look like a ``Browser``.
+
+    ``launch_persistent_context`` returns a ``BrowserContext`` that owns the
+    whole profile, so a second ``new_context()`` is not allowed.  Workers call
+    ``browser.new_context(...)`` exactly once, so we hand them this proxy: it
+    returns the profile context and reports connectivity like a browser.
+    """
+
+    def __init__(self, context, profile_dir):
+        self._context = context
+        self.profile_dir = str(profile_dir)
+
+    def new_context(self, **kwargs):
+        # The profile IS the context.  Options were applied at launch time.
+        return self._context
+
+    @property
+    def contexts(self):
+        return [self._context]
+
+    def is_connected(self):
+        try:
+            browser = getattr(self._context, "browser", None)
+            if browser is not None:
+                return bool(browser.is_connected())
+        except Exception:
+            pass
+        return True
+
+    def close(self):
+        try:
+            self._context.close()
+        except Exception:
+            pass
+
+
+def _launch_chromium_persistent(persistent_dir, headless, proxy, log_fn, context_kwargs):
+    """Open a real per-account Chromium profile (survives between runs)."""
+    from pathlib import Path as _Path
+    from playwright.sync_api import sync_playwright
+
+    profile_dir = _Path(str(persistent_dir)).expanduser()
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    if log_fn:
+        log_fn(f"[Browser] Opening the account's own browser profile: {profile_dir}")
+
+    pw = sync_playwright().start()
+    try:
+        launch_args = [
+            "--disable-blink-features=AutomationControlled",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-background-timer-throttling",
+            "--disable-renderer-backgrounding",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-popup-blocking",
+        ]
+        options: Dict[str, Any] = {
+            "headless": headless,
+            "args": launch_args,
+            "viewport": None,          # set below / by the identity
+        }
+        options.update({k: v for k, v in (context_kwargs or {}).items() if v is not None})
+        if proxy:
+            options["proxy"] = proxy
+        if options.get("viewport") is None:
+            options.pop("viewport", None)
+        context = pw.chromium.launch_persistent_context(str(profile_dir), **options)
+    except Exception:
+        try:
+            pw.stop()
+        except Exception:
+            pass
+        raise
+
+    proxy_browser = _PersistentProfile(context, profile_dir)
+    handle = _ChromiumHandle(pw, proxy_browser)
+    if log_fn:
+        log_fn("[Browser] Chromium profile started (cookies/history persist between runs)")
+    return proxy_browser, handle
 
 
 class _ChromiumHandle:
@@ -607,16 +725,28 @@ def apply_chromium_stealth(context, log_fn: LogFn = None, fingerprint: Optional[
         platform = fp.get("platform") or _platform_for_ua(ua)
         hw = int(fp.get("hardware_concurrency") or 8)
         mem = int(fp.get("device_memory") or 8)
-        context.set_extra_http_headers({"Accept-Language": "en-US,en;q=0.9"})
+        languages = fp.get("languages")
+        if isinstance(languages, list) and languages:
+            accept = ", ".join([str(languages[0])] +
+                               [f"{lang};q={0.9 - i * 0.1:.1f}"
+                                for i, lang in enumerate(languages[1:])])
+        else:
+            accept = "en-US,en;q=0.9"
+        context.set_extra_http_headers({"Accept-Language": accept})
         # Add the init script BEFORE any page is created so it runs first.
-        context.add_init_script(_build_stealth_init_script(ua, platform, hw, mem))
+        # The fingerprint may carry permanent screen/window metrics so the same
+        # account reports the same device on every launch.
+        context.add_init_script(_build_stealth_init_script(ua, platform, hw, mem, fp))
         if log_fn:
             vp = fp.get("viewport") or {}
+            screen = fp.get("screen") or {}
+            stable = " (stable device profile)" if screen.get("width") else ""
             log_fn(
                 f"[Stealth] Chromium anti-detect applied: UA={ua[:45]}... "
                 f"platform={platform} hw={hw} mem={mem}GB "
-                f"viewport={vp.get('width')}x{vp.get('height')} "
-                f"WebRTC-leak=blocked"
+                f"viewport={vp.get('width')}x{vp.get('height')}"
+                + (f" screen={screen.get('width')}x{screen.get('height')}" if screen else "")
+                + f" WebRTC-leak=blocked{stable}"
             )
     except Exception as e:
         if log_fn:
@@ -634,11 +764,19 @@ def chromium_context_kwargs(fingerprint: Optional[Dict[str, Any]] = None) -> Dic
     kwargs = {
         "user_agent": fp.get("user_agent") or _random_ua(),
         "viewport": fp.get("viewport") or _random_viewport(),
-        "locale": "en-US",
-        "timezone_id": "America/New_York",
+        "locale": fp.get("locale") or "en-US",
+        "timezone_id": fp.get("timezone_id") or "America/New_York",
         "java_script_enabled": True,
         "ignore_https_errors": False,
     }
+    # Permanent device-profile extras (per account) — omit when absent so the
+    # pre-Phase-14 behaviour is unchanged for callers that pass no fingerprint.
+    if fp.get("screen"):
+        kwargs["screen"] = fp["screen"]
+    if fp.get("device_scale_factor"):
+        kwargs["device_scale_factor"] = float(fp["device_scale_factor"])
+    if fp.get("color_scheme"):
+        kwargs["color_scheme"] = fp["color_scheme"]
     # Stash the fingerprint on the dict so the caller can extract it and pass
     # it to apply_chromium_stealth().  (new_context ignores unknown keys?  No —
     # it would error, so we keep this OUT of kwargs and return it separately.)

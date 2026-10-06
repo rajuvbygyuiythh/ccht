@@ -587,6 +587,9 @@ def _make_bot(ba, account, *, session_cfg=None):
         "log_health_on_start": True,
     }, **(session_cfg or {}))
     bot.context = StubContext()
+    bot._identity = None
+    bot._identity_logged = False
+    bot._profile_ready = False
     bot._session_blind = False
     bot._session_repair_attempted = False
     bot._session_repair_reason = ""

@@ -162,6 +162,40 @@ DEFAULT_REPLIES = {
     "warmup_messages_per_chat_max": 2,
 }
 
+DEFAULT_BROWSER_IDENTITY = {
+    # Phase 14 — one account = one permanent "device profile".
+    # The account always opens the SAME browser (UA, viewport, screen, hardware,
+    # memory, timezone, locale) while other accounts keep their own devices.
+    "enabled": True,
+    # "persistent" (default) = every account gets its OWN real Chrome profile
+    # (separate cookies, history, cache, IndexedDB, fingerprint) that survives
+    # between runs.  "context" = one shared browser with an isolated context per
+    # account (lower RAM, but no real profile on disk).
+    "profile_mode": "persistent",
+    "profiles_dir_name": "browser_profiles",
+    # Guarantee that no two accounts share the same device signature.
+    "unique_between_accounts": True,
+    # Reuse the UA/platform captured when the session was created.
+    "adopt_observed_fingerprint": True,
+    # After a ban, the account gets a brand-new device for its next login.
+    "rotate_on_ban": True,
+    # URLs visited once inside a NEW persistent profile (history seed). Empty =
+    # nothing extra is visited.
+    "warmup_sites": [],
+    "log_identity_on_start": True,
+    # Never let a second account open a Chrome profile another account created.
+    "owner_guard": True,
+    # Verify the live browser against the device profile BEFORE logging in.
+    "verify_before_login": True,
+    # True = refuse to log in when that check fails (False = warn + continue).
+    "verify_strict": False,
+    # Optional real fingerprint-checker page used for the check ("" = the page
+    # the bot is already on).
+    "verify_url": "",
+    # Keep the profile + identity after a successful login.
+    "save_profile_after_login": True,
+}
+
 DEFAULT_WEBSITE_VISITS = {
     # Disposable pre-homepage tabs (already loaded from urls.txt by default).
     "pre_homepage_enabled": True,
@@ -432,6 +466,36 @@ def normalize_session_management(section=None) -> dict:
 def load_session_management(path=None) -> dict:
     config = load_config(path)
     return normalize_session_management(config.get("session_management"))
+
+
+_BROWSER_IDENTITY_BOOL = (
+    "enabled", "unique_between_accounts", "adopt_observed_fingerprint",
+    "rotate_on_ban", "log_identity_on_start", "owner_guard",
+    "verify_before_login", "verify_strict", "save_profile_after_login",
+)
+
+
+def normalize_browser_identity(section=None) -> dict:
+    """Validate the ``browser_identity`` section (Phase 14 device profiles)."""
+    values = _normalize_section(
+        section,
+        DEFAULT_BROWSER_IDENTITY,
+        bool_keys=_BROWSER_IDENTITY_BOOL,
+        list_keys=("warmup_sites",),
+    )
+    if str(values.get("profile_mode") or "").lower() not in ("context", "persistent"):
+        values["profile_mode"] = DEFAULT_BROWSER_IDENTITY["profile_mode"]
+    else:
+        values["profile_mode"] = str(values["profile_mode"]).lower()
+    if not str(values.get("profiles_dir_name") or "").strip():
+        values["profiles_dir_name"] = DEFAULT_BROWSER_IDENTITY["profiles_dir_name"]
+    return values
+
+
+def load_browser_identity(path=None) -> dict:
+    """Load the per-account browser identity / device-profile settings."""
+    config = load_config(path)
+    return normalize_browser_identity(config.get("browser_identity"))
 
 
 _REPLIES_NUMERIC = (

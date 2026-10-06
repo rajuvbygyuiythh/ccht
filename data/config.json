@@ -129,5 +129,20 @@
     "context_pool_min_browsers": 1,
     "governor_enabled": true,
     "governor_kill_processes": false
+  },
+  "browser_identity": {
+    "enabled": true,
+    "profile_mode": "persistent",
+    "profiles_dir_name": "browser_profiles",
+    "unique_between_accounts": true,
+    "adopt_observed_fingerprint": true,
+    "rotate_on_ban": true,
+    "warmup_sites": [],
+    "log_identity_on_start": true,
+    "owner_guard": true,
+    "verify_before_login": true,
+    "verify_strict": false,
+    "verify_url": "",
+    "save_profile_after_login": true
   }
 }

@@ -205,11 +205,17 @@ class ContextPool:
         fingerprint=None,
         proxy: Optional[Dict[str, Any]] = None,
         extra_context_options: Optional[Dict[str, Any]] = None,
+        stealth_fingerprint: Optional[Dict[str, Any]] = None,
     ) -> Optional[ContextSlot]:
         """Create a new isolated context for *account_key*.
 
         Blocks until a pool slot is available (semaphore-bounded).
         Returns a ``ContextSlot`` or ``None`` on failure.
+
+        ``extra_context_options`` carries the account's permanent device
+        profile (UA, viewport, screen, locale, timezone — see
+        ``browser.browser_identity``) so two accounts never look like the same
+        browser; ``stealth_fingerprint`` adds the matching init-script layer.
         """
         if not self.is_started():
             return None
@@ -218,7 +224,7 @@ class ContextPool:
         try:
             return self._do_create(
                 account_key, storage_state_path, fingerprint, proxy,
-                extra_context_options,
+                extra_context_options, stealth_fingerprint,
             )
         except Exception:
             self._semaphore.release()
@@ -231,6 +237,7 @@ class ContextPool:
         fingerprint,
         proxy,
         extra_context_options,
+        stealth_fingerprint=None,
     ) -> Optional[ContextSlot]:
         import os
         with self._lock:
@@ -258,6 +265,17 @@ class ContextPool:
             if self.verbose:
                 print(f"[ContextPool] new_context failed: {e}")
             return None
+
+        # Anti-detect init script for Chromium, using the account's permanent
+        # device profile (must run BEFORE the first page is created).
+        if stealth_fingerprint:
+            try:
+                from browser.browser_engine import apply_chromium_stealth
+                apply_chromium_stealth(context, print if self.verbose else None,
+                                       fingerprint=stealth_fingerprint)
+            except Exception as e:
+                if self.verbose:
+                    print(f"[ContextPool] stealth apply skipped: {e}")
 
         # Resource blocking.
         self._apply_resource_blocking(context)

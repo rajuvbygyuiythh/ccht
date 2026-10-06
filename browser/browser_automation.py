@@ -21,6 +21,17 @@ from browser.account_session_store import (
     session_stock_summary,
 )
 
+# Phase 14 — permanent per-account device profile (same account = same browser,
+# different accounts = different browsers).  Best-effort: without it the bot
+# keeps the old random-per-launch fingerprint behaviour.
+try:
+    from browser import browser_identity
+    BROWSER_IDENTITY_AVAILABLE = True
+except Exception as _browser_identity_err:  # pragma: no cover
+    browser_identity = None
+    BROWSER_IDENTITY_AVAILABLE = False
+    _BROWSER_IDENTITY_IMPORT_ERROR = str(_browser_identity_err)
+
 # Phase 13 — session auto-load / blind-session detection + repair.
 # Best-effort import: without it the bot keeps its old behaviour unchanged.
 try:
@@ -478,6 +489,12 @@ class ChitchatAutomation:
         self._detect_warned = False
         self._heal_logged = False
 
+        # --- Phase 14: permanent device profile (identity) ---
+        self._identity = None
+        self._identity_logged = False
+        self._profile_ready = False
+        self._last_fingerprint_check = None
+
         # --- Phase 13: session auto-load / blind-session repair state ---
         # "blind" = the saved cookies cannot log this account in any more.
         self._session_blind = False
@@ -485,6 +502,84 @@ class ChitchatAutomation:
         self._session_repair_reason = ""
         self._last_session_refresh = 0.0
         self._session_probe_reason = ""
+
+    # ------------------------------------------------------------------ #
+    #  PHASE 14 — PERMANENT DEVICE PROFILE (identity)
+    # ------------------------------------------------------------------ #
+    def _identity_cfg(self):
+        """browser_identity config (safe defaults when unavailable)."""
+        if not BROWSER_IDENTITY_AVAILABLE:
+            return {}
+        try:
+            return browser_identity.config()
+        except Exception:
+            return {}
+
+    def _ensure_identity(self, *, announce=True):
+        """Resolve this account's permanent device profile (stable per account).
+
+        The profile is derived once and stored in the session folder +
+        registry, so the SAME account always opens the SAME browser (UA,
+        viewport, screen, hardware, memory, timezone, locale) while every other
+        account keeps its own distinct device.
+        """
+        if self._identity is not None:
+            return self._identity
+        if not BROWSER_IDENTITY_AVAILABLE or not isinstance(self.account, dict):
+            return None
+        cfg = self._identity_cfg()
+        if not browser_identity.enabled(cfg):
+            return None
+        try:
+            identity = browser_identity.identity_for(self.account, cfg=cfg, log_fn=self.log)
+        except Exception as error:
+            self.log(f"[Identity] could not resolve the device profile: {error}")
+            return None
+        if not identity:
+            return None
+        self._identity = identity
+        try:
+            self.account["identity"] = identity
+        except Exception:
+            pass
+        if announce and cfg.get("log_identity_on_start", True):
+            self._identity_logged = True
+            self.log(f"[Identity] {browser_identity.account_key_for(self.account)} → "
+                     f"{browser_identity.describe(identity)}")
+            if identity.get("source") == "observed":
+                self.log("[Identity] reusing the same browser this account "
+                         "was logged in with")
+            if identity.get("rotations"):
+                self.log(f"[Identity] device rotated {identity['rotations']}x "
+                         f"({identity.get('rotation_reason') or 'after a ban'})")
+        return identity
+
+    def _identity_context_options(self):
+        """Identity kwargs for ``new_context`` (+ the stealth fingerprint)."""
+        identity = self._ensure_identity()
+        if not identity:
+            return {}, None
+        try:
+            return (browser_identity.context_kwargs(identity),
+                    browser_identity.stealth_fingerprint(identity))
+        except Exception:
+            return {}, None
+
+    def _rotate_identity_after_ban(self):
+        """Give a banned account a brand-new device for its next login."""
+        if not BROWSER_IDENTITY_AVAILABLE or not isinstance(self.account, dict):
+            return
+        cfg = self._identity_cfg()
+        if not browser_identity.enabled(cfg) or not cfg.get("rotate_on_ban", True):
+            return
+        try:
+            rotated = browser_identity.rotate_identity(
+                self.account, reason="account banned", cfg=cfg, log_fn=self.log)
+            if rotated:
+                self._identity = rotated
+                self.account["identity"] = rotated
+        except Exception as error:
+            self.log(f"[Identity] rotation after ban failed: {error}")
 
     def _launch_camoufox(self):
         """Launch the configured browser engine (Chromium or Camoufox).
@@ -521,6 +616,39 @@ class ChitchatAutomation:
 
         from browser.browser_engine import launch_browser, close_browser, kill_orphan_browsers
 
+        # --- Phase 14: persistent per-account profile (optional) ----------
+        # profile_mode="persistent" opens the account's OWN Chromium profile, so
+        # cookies, IndexedDB, cache and history survive between runs (the
+        # truest "same browser").  Default mode is the shared browser + context.
+        persistent_dir = None
+        persistent_options = None
+        if engine == "chromium" and BROWSER_IDENTITY_AVAILABLE:
+            try:
+                identity = self._ensure_identity()
+                identity_cfg = self._identity_cfg()
+                if identity and browser_identity.profile_mode(identity_cfg) == "persistent":
+                    # Phase 14: the account's OWN profile — claimed for this
+                    # account only.  A folder owned by another account is never
+                    # opened (a separate folder is used instead).
+                    persistent_dir = browser_identity.claim_profile(
+                        self.account, cfg=identity_cfg, log_fn=self.log)
+                    persistent_options = browser_identity.context_kwargs(identity)
+                    if persistent_dir and not browser_identity.profile_is_used(persistent_dir):
+                        state_path = ""
+                        if self.account_mode == "restore" and isinstance(self.account, dict):
+                            state_path = str(self.account.get("storage_state_path") or "")
+                        if state_path and os.path.isfile(state_path):
+                            persistent_options["storage_state"] = state_path
+                            self.log("[Identity] first launch in this profile — "
+                                     "importing the saved session into it")
+                    else:
+                        self.log("[Identity] profile already in use — cookies come "
+                                 "from the profile itself")
+            except Exception as error:
+                self.log(f"[Identity] persistent profile unavailable: {error}")
+                persistent_dir = None
+                persistent_options = None
+
         handle = None
         browser = None
         max_attempts = 3
@@ -533,6 +661,8 @@ class ChitchatAutomation:
                     log_fn=self.log,
                     fingerprint=self.restore_fingerprint,
                     firefox_prefs=firefox_prefs,
+                    persistent_dir=persistent_dir,
+                    context_kwargs=persistent_options,
                 )
                 break
             except Exception as launch_err:
@@ -1023,12 +1153,22 @@ class ChitchatAutomation:
                 self.account,
                 self.context,
                 page,
-                generated_fingerprint=(getattr(self, "generated_fingerprint", None)
+                generated_fingerprint=(getattr(self, "_identity", None)
+                                       or getattr(self, "generated_fingerprint", None)
                                        or getattr(self, "restore_fingerprint", None)),
                 proxy_config=getattr(self, "proxy_config", None),
                 history=getattr(self, "_navigation_history", None) or [],
             )
             self.log(f"[Account] Saved browser session for {self.account['email']} to {session_dir}")
+            # Phase 14: keep the device profile with the session so the next run
+            # opens the exact same browser.
+            if BROWSER_IDENTITY_AVAILABLE and isinstance(self.account, dict):
+                try:
+                    if self.account.get("session_dir") and self._identity is None:
+                        self._ensure_identity(announce=False)
+                    browser_identity.attach_session_dir(self.account, self._identity)
+                except Exception:
+                    pass
             # Phase 13: remember when this session was verified + its health,
             # so the GUI/tools/session doctor can see it without a launch.
             try:
@@ -1139,6 +1279,8 @@ class ChitchatAutomation:
                 self.log(f"[Ban] Flagged session as banned (auto-delete disabled)")
         except Exception as error:
             self.log(f"[Ban] Warning during session cleanup: {error}")
+        # Phase 14: a banned account must not log back in from the same device.
+        self._rotate_identity_after_ban()
         # Live stock update after the ban is processed.
         self._log_account_stock(prefix="[Ban] ")
         if auto_close:
@@ -2547,6 +2689,9 @@ class ChitchatAutomation:
         self.log(f"[Session] repairing {self._account_label()} "
                  f"by logging in with stored credentials...")
         try:
+            if not self._verify_fingerprint_before_login(page, purpose="repair login"):
+                self.log("[Session] repair cancelled — fingerprint verification failed")
+                return False
             if not self.login_with_account(page):
                 self.log("[Session] ✗ repair login failed — account needs manual attention")
                 return False
@@ -2609,6 +2754,13 @@ class ChitchatAutomation:
         except Exception:
             return True, {}
         state = (plan.get("health") or {}).get("state", "unknown")
+        # Phase 14: in persistent-profile mode the live cookies are inside the
+        # account's own browser profile, so a stale/absent storage_state.json is
+        # not a reason to skip.
+        if plan.get("blind") and self._profile_cookies_present():
+            self.log(f"[Identity] {self._account_label()}: saved file looks "
+                     f"{state or 'stale'} but the persistent profile holds the cookies")
+            return True, plan
         if plan.get("action") == "skip" and plan.get("blind"):
             self.log(f"[Session] skipping {self._account_label()}: {plan.get('reason')}")
             return False, plan
@@ -2620,6 +2772,124 @@ class ChitchatAutomation:
                      f"{(plan.get('health') or {}).get('days_left')} day(s)")
         return True, plan
 
+    def _verify_fingerprint_before_login(self, page, *, purpose="login"):
+        """Check the live browser against the account's device profile.
+
+        This runs BEFORE any credential is typed: the page is asked what the
+        site can see (UA, platform, screen, viewport, DPR, timezone, WebGL) and
+        every value is compared with the account's permanent identity.  Nothing
+        is logged in when ``verify_strict`` is on and the check fails.
+        """
+        if not BROWSER_IDENTITY_AVAILABLE:
+            return True
+        cfg = self._identity_cfg()
+        if not cfg.get("verify_before_login", True):
+            return True
+        identity = self._ensure_identity(announce=False)
+        if not identity:
+            return True
+        # optional: check against a real fingerprint-checker page first
+        verify_url = str(cfg.get("verify_url") or "").strip()
+        if verify_url:
+            try:
+                self.log(f"[Fingerprint] opening the checker page {verify_url}")
+                page.goto(verify_url, wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(1500)
+            except Exception as error:
+                self.log(f"[Fingerprint] checker page unavailable ({error}) — "
+                         f"probing the current page instead")
+        try:
+            result = browser_identity.verify_identity_on_page(page, identity)
+        except Exception as error:
+            self.log(f"[Fingerprint] verification error: {error}")
+            return True
+        self._last_fingerprint_check = result
+        if result.get("ok"):
+            observed = result.get("observed") or {}
+            self.log(f"[Fingerprint] ✓ device verified before {purpose}: "
+                     f"{identity.get('os')} · {observed.get('viewport', {}).get('width')}x"
+                     f"{observed.get('viewport', {}).get('height')} · "
+                     f"{observed.get('timezone')}")
+            return True
+        self.log("[Fingerprint] ⛔ MISMATCH between the saved device profile and the "
+                 "live browser:")
+        for item in result.get("mismatches", [])[:6]:
+            self.log(f"[Fingerprint]    - {item}")
+        if bool(cfg.get("verify_strict", False)):
+            self.log(f"[Fingerprint] verify_strict is on — refusing to log in with a "
+                     f"mismatched fingerprint")
+            return False
+        self.log("[Fingerprint] continuing (verify_strict is off) — set "
+                 "verify_strict=true to block logins on a mismatch")
+        return True
+
+    def _save_profile_after_login(self, page=None):
+        """Remember the logged-in profile (identity + owner + probe snapshot)."""
+        if not BROWSER_IDENTITY_AVAILABLE:
+            return
+        cfg = self._identity_cfg()
+        if not cfg.get("save_profile_after_login", True):
+            return
+        try:
+            identity = self._ensure_identity(announce=False)
+            probe = getattr(self, "_last_fingerprint_check", None)
+            probe = (probe or {}).get("observed") if isinstance(probe, dict) else None
+            profile_dir = None
+            if identity is not None:
+                profile_dir = browser_identity.profile_dir_for(self.account, cfg)
+            browser_identity.mark_profile_saved(self.account, identity,
+                                                probe=probe, profile_dir=profile_dir,
+                                                log_fn=self.log)
+        except Exception as error:
+            self.log(f"[Profile] could not record the saved profile: {error}")
+
+    def _profile_cookies_present(self):
+        """True when this account's persistent profile already holds browser data."""
+        if not BROWSER_IDENTITY_AVAILABLE or not isinstance(self.account, dict):
+            return False
+        try:
+            cfg = self._identity_cfg()
+            if browser_identity.profile_mode(cfg) != "persistent":
+                return False
+            folder = browser_identity.profile_dir_for(self.account, cfg)
+            ready = bool(folder) and browser_identity.profile_is_used(folder)
+            self._profile_ready = ready
+            return ready
+        except Exception:
+            return False
+
+    def _maybe_warmup_profile(self):
+        """Seed a brand-new profile with a little real browsing history."""
+        if not BROWSER_IDENTITY_AVAILABLE or self.context is None:
+            return
+        try:
+            cfg = self._identity_cfg()
+            if browser_identity.profile_mode(cfg) != "persistent":
+                return
+            identity = self._ensure_identity(announce=False)
+            sites = browser_identity.warmup_pending(identity, cfg)
+            if not sites:
+                return
+            page = self.context.new_page()
+            visited = []
+            for url in sites[:5]:
+                target = url if "://" in url else f"https://{url}"
+                try:
+                    page.goto(target, wait_until="domcontentloaded", timeout=20000)
+                    visited.append(target)
+                    page.wait_for_timeout(random.randint(1200, 3200))
+                except Exception as error:
+                    self.log(f"[Identity] warm-up skipped {target}: {error}")
+            try:
+                page.close()
+            except Exception:
+                pass
+            browser_identity.mark_warmup_done(self.account, identity, visited)
+            self.log(f"[Identity] profile warmed up with {len(visited)} site(s) "
+                     f"(history seed)")
+        except Exception as error:
+            self.log(f"[Identity] warm-up error: {error}")
+
     def restore_saved_account_session(self, page):
         """Open the authenticated app using the restored cookies/local storage.
 
@@ -2630,9 +2900,13 @@ class ChitchatAutomation:
         """
         try:
             if not self.account or not self.account.get("storage_state_path"):
-                self.log("[Restore] ✗ Saved browser state is missing")
-                self._session_blind_report("no saved storage state")
-                return False
+                if self._profile_cookies_present():
+                    self.log("[Identity] no storage_state.json — using the "
+                             "persistent profile's own cookies")
+                else:
+                    self.log("[Restore] ✗ Saved browser state is missing")
+                    self._session_blind_report("no saved storage state")
+                    return False
 
             restore_url = self.account.get("restore_url") or self.NEW_SESSION_ENTRY_URL
             self.log(f"[Restore] Loading saved session for {self._account_label()} "
@@ -2765,12 +3039,21 @@ class ChitchatAutomation:
             else:
                 self.log("[Step 1/3] Logging in with account...")
 
+                # Phase 14: never type credentials before checking that the
+                # browser really is the account's own device profile.
+                if not self._verify_fingerprint_before_login(page, purpose="login"):
+                    self.log("[Step 1/3] ✗ Login aborted — fingerprint mismatch")
+                    return False
                 if not self.login_with_account(page):
                     self.log("[Step 1/3] ✗ Login failed")
                     return False
 
                 self.log("[Step 1/3] ✓ Login successful!")
             
+            # Phase 14: the login worked — keep this Chrome profile for the
+            # account (identity + owner + observed fingerprint snapshot).
+            self._save_profile_after_login(page)
+
             # Hide browser window after successful login if requested
             if self.hide_after_login:
                 try:
@@ -4069,11 +4352,19 @@ class ChitchatAutomation:
                 if self.account_mode == "restore":
                     storage_state_path = self.account.get("storage_state_path")
                     if not storage_state_path or not os.path.isfile(storage_state_path):
-                        self.log("[Restore] ✗ Saved storage state file is missing")
-                        if launch_slot_held and self._engine_bridge is not None:
-                            self._engine_bridge.launch_release()
-                        return False
-                    context_options["storage_state"] = storage_state_path
+                        # Phase 14: a persistent profile keeps the live cookies
+                        # itself, so a missing/renamed storage_state file must not
+                        # block the account.
+                        if self._profile_cookies_present():
+                            self.log("[Identity] no storage_state.json — the account's "
+                                     "own Chrome profile already holds the cookies")
+                        else:
+                            self.log("[Restore] ✗ Saved storage state file is missing")
+                            if launch_slot_held and self._engine_bridge is not None:
+                                self._engine_bridge.launch_release()
+                            return False
+                    else:
+                        context_options["storage_state"] = storage_state_path
 
                 # For the Chromium engine, add stealth kwargs (random UA,
                 # viewport, locale, timezone) so the browser looks like a real
@@ -4088,13 +4379,18 @@ class ChitchatAutomation:
                     try:
                         from browser.browser_engine import chromium_context_kwargs
                         # Build ONE coherent fingerprint (UA + viewport +
-                        # platform + hw + memory) and reuse it for both the
-                        # context kwargs AND the init-script stealth, so
-                        # navigator.userAgent always agrees with the context UA
-                        # (no mismatch leak).  Merge: stealth kwargs first, then
-                        # caller overrides (e.g. storage_state) so the account
-                        # session wins.
-                        _stealth_kwargs, _stealth_fp = chromium_context_kwargs()
+                        # platform + hw + memory + screen) and reuse it for both
+                        # the context kwargs AND the init-script stealth, so
+                        # navigator.* always agrees with the context (no mismatch
+                        # leak).  Phase 14: the fingerprint is the ACCOUNT'S
+                        # permanent device profile, so the same account always
+                        # opens the same browser (and no two accounts collide).
+                        # Merge: identity profile first, then caller overrides
+                        # (e.g. storage_state) so the account session wins.
+                        _identity_kwargs, _identity_fp = self._identity_context_options()
+                        _stealth_kwargs, _stealth_fp = chromium_context_kwargs(
+                            fingerprint=_identity_fp or None)
+                        _stealth_kwargs.update(_identity_kwargs)
                         _stealth_kwargs.update(context_options)
                         context_options = _stealth_kwargs
                     except Exception:
@@ -4121,6 +4417,9 @@ class ChitchatAutomation:
                     self.context.on("page", self._track_page_history)
                 except Exception:
                     pass
+                # Phase 14: first launch in a brand-new persistent profile gets a
+                # small history seed (only if warmup_sites is configured).
+                self._maybe_warmup_profile()
                 # --- Performance: optionally block heavy resource types ---
                 self._apply_resource_blocking(self.context)
 

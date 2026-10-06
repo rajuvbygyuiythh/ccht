@@ -14,3 +14,15 @@ _source/
 # selector doctor / detection artifacts (runtime)
 logs/
 config/chat_selectors.json.bak
+
+# Phase 14 — real per-account Chrome profiles (huge, machine-specific binaries)
+browser_profiles/
+data/browser_profiles/
+
+# dead sessions parked by tools/session_doctor.py --prune (never deleted)
+account_sessions/_dead/
+data/account_sessions/_dead/
+
+# identity registry lock (transient)
+account_sessions/_identities.lock
+data/account_sessions/_identities.lock

@@ -86,6 +86,7 @@ data/requirements.txt` → `python -m playwright install chromium`.
 | `python test_chat_detect.py` | legacy | **47/47 passed** |
 | `python test_selector_doctor.py` | legacy (jsdom) | **105/105 passed** |
 | `python test_session_health.py` | sessions (offline) | **152/152 passed** |
+| `python test_browser_identity.py` | identity (offline) | **207/207 passed** |
 | `python tools/live_chat.py` | flow (default) | interactive REPL |
 
 ## Project layout
@@ -203,6 +204,54 @@ Tests: `python test_selector_doctor.py` (105 checks; the jsdom pass runs the
 real extractor against the new-markup fixtures and is skipped when
 `node`/`jsdom` are missing).
 
+## Separate Chrome profile per account (v2.5 — "প্রতিটা account এর আলাদা profile + fingerprint")
+
+Every account now opens **its own real Chrome profile** with **its own
+fingerprint**. Two accounts can never log in from one profile.
+
+| Rule | How it is enforced |
+|------|--------------------|
+| separate Chrome profile per account | `browser_profiles/<account>/` — real Chromium profile (cookies, history, cache, IndexedDB survive between runs) |
+| separate fingerprint per account | `browser/browser_identity.py` derives a permanent device (UA, platform, screen, viewport, DPR, hardware, memory, timezone, locale) from the account key; a registry makes sure no two accounts share a device |
+| never two accounts in one profile | each profile stores `owner.json`; if a folder belongs to another account, the bot **refuses it** and gives this account its own folder (log: `[Profile] ⛔ … belongs to another account`) |
+| fingerprint verified **before** login | the page is asked what the site can see (UA/platform/screen/viewport/DPR/timezone/WebGL) and every value is compared with the profile — `[Fingerprint] ✓ device verified before login`; a mismatch is listed in full and, with `verify_strict: true`, blocks the login |
+| profile kept **after** login | `[Profile] saved the logged-in browser profile …` → `identity.json`, `owner.json` (`logged_in_at`) and `profile_state.json` (observed fingerprint) are written next to the profile |
+| same browser next run | the profile + identity are reloaded, so the account reappears as the same device it logged in with |
+
+```bat
+python tools/session_doctor.py --profiles          :: who owns which Chrome profile
+python tools/session_doctor.py --identities        :: which device each account uses
+python tools/session_doctor.py --identity EMAIL    :: one account in detail
+python tools/session_doctor.py --new-identity EMAIL --apply   :: fresh device (after a ban)
+```
+
+Config (`data/config.json` → `browser_identity`, all optional):
+
+```json
+"browser_identity": {
+  "enabled": true,
+  "profile_mode": "persistent",
+  "unique_between_accounts": true,
+  "adopt_observed_fingerprint": true,
+  "rotate_on_ban": true,
+  "owner_guard": true,
+  "verify_before_login": true,
+  "verify_strict": false,
+  "verify_url": "",
+  "save_profile_after_login": true,
+  "warmup_sites": [],
+  "log_identity_on_start": true
+}
+```
+
+* `profile_mode: "context"` goes back to one shared browser with an isolated
+  context per account (lower RAM, but no real profile on disk).
+* `verify_url` — optional real fingerprint-checker page opened before the check
+  (empty = the page the bot is already on).
+* `warmup_sites` — a few URLs visited once inside a brand-new profile so it has
+  some history before the account logs in.
+* Profiles are **never** committed to git (`.gitignore` → `browser_profiles/`).
+
 ## Saved sessions auto-load + blind session repair (v2.4 — "session diye acc auto browser e load")
 
 Every saved session (`account_sessions/`, `data/account_sessions/`) is checked
@@ -264,6 +313,11 @@ defaults are shown in `docs/SESSION_PLAN.md`):
    verified restore, blind→auto-repair, keep-alive cookie refresh, honest
    alive/blind stock counts, session columns in the account manager, and the
    `session_management` config block (see `docs/SESSION_PLAN.md`)
+9. **v2.5 per-account browser profile** — `browser/browser_identity.py` (permanent
+   device profile per account, owner guard, fingerprint verification before
+   login, profile saved after login), persistent Chromium profiles, identity
+   passed into pooled contexts, `--profiles/--identities/--new-identity` tools
+   and the `browser_identity` config block (see `docs/BROWSER_IDENTITY_PLAN.md`)
 
 Everything else (browser/, entry/, core/, docs/, config/, bats) is
 unchanged from the original project.

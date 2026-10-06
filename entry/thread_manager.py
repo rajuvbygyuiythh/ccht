@@ -5,6 +5,7 @@ Manages multiple browser workers running concurrently
 import os
 import random
 import threading
+from typing import Any, Dict, Optional
 from PyQt6.QtCore import QObject, pyqtSignal
 from browser.browser_automation import ChitchatWorker
 from core.config_loader import normalize_chat_timing, load_runtime_config
@@ -543,6 +544,23 @@ class ThreadManager(QObject):
                         )
             except Exception:
                 pass
+        # Phase 14: with one real Chrome profile per account the shared-browser
+        # context pool is the wrong tool (a profile == a browser).  Skip it and
+        # let every worker open its own profile instead.
+        separate_profiles = False
+        try:
+            from browser import browser_identity as _bi
+            separate_profiles = _bi.profile_mode(_bi.config()) == "persistent"
+        except Exception:
+            separate_profiles = False
+        if separate_profiles and use_pool:
+            self.thread_log.emit(
+                0,
+                "[Profile] one separate Chrome profile per account — context pool "
+                "disabled (each worker opens its own browser profile)",
+            )
+            use_pool = False
+
         if use_pool:
             self._start_context_pool(thread_count)
         elif thread_count > 1:
@@ -808,12 +826,35 @@ class ThreadManager(QObject):
 
             fingerprint = account.get("fingerprint_path")
             proxy = account.get("saved_proxy") or account.get("proxy")
-            
+
+            # Phase 14: every pooled context gets the account's permanent device
+            # profile, so N parallel accounts look like N different browsers.
+            identity_options: Dict[str, Any] = {}
+            stealth_fingerprint = None
+            try:
+                from browser import browser_identity as _bi
+                _key = _bi.account_key_for(account)
+                options = _bi.pool_options(
+                    account,
+                    log_fn=lambda line: self.thread_log.emit(0, line),
+                )
+                identity_options = options.get("extra_context_options") or {}
+                stealth_fingerprint = options.get("stealth_fingerprint")
+                if identity_options:
+                    self.thread_log.emit(
+                        0,
+                        f"[Identity] {_key} → {_bi.describe(options.get('identity'))}",
+                    )
+            except Exception as _identity_err:
+                self.thread_log.emit(0, f"[Identity] pool identity unavailable: {_identity_err}")
+
             slot = self._context_pool.create_context(
                 account_key=account.get("email", "unknown"),
                 storage_state_path=storage_state_path,
                 fingerprint=fingerprint,
                 proxy=proxy,
+                extra_context_options=identity_options or None,
+                stealth_fingerprint=stealth_fingerprint,
             )
             
             if slot is None:
