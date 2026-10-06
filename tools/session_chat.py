@@ -243,33 +243,39 @@ def _page_username(automation, page, log=print):
 def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=print,
                    ws_url=None, send_event="", dom_fallback=True, probe=False,
                    ws_http_base=""):
-    """Restore the session, receive chat events on Socket.IO, and send via HTTP.
+    """Restore the browser session, receive Socket.IO events, and use send adapters.
 
-    The browser stays open as the session holder. Incoming SMS and delivery
-    echoes arrive as ``chatMessage`` events over the socket; on the captured
-    build, replies use the site's own learned HTTP request from the backend.
-    If no HTTP template is known yet, the caller can type through the page to
-    teach the request sniffer; ``dom_fallback`` remains available if delivery
-    cannot be confirmed.
+    The browser stays open as the session holder. Incoming SMS and echoes arrive
+    as ``chatMessage`` events over the socket. The supplied WS entry has no
+    client chat-send frame, but does not show the other requests or establish the
+    live write endpoint/auth method. If a send template is available (or learned
+    by observing a page send), the backend can replay it; ``dom_fallback``
+    remains available if delivery cannot be confirmed.
     """
     from core.chat_ws import (DEFAULT_WS_URL, ChatWebSocket, SendRequestSniffer,
                               cookies_header, load_ws_config, save_ws_config)
 
-    # Whatever a previous run learned (--probe / --identity) is reused, so the
-    # backend can start chatting without any extra flags.
+    # Reuse the learned HTTP template and identity below, but do not enable a
+    # saved socket-send event implicitly. Socket sends need an explicit event or
+    # --ws-probe opt-in because the supplied capture does not verify one.
     learned = load_ws_config()
-    send_event = send_event or str(learned.get("send_event") or "")
+    send_event = str(send_event or "")
     if send_event:
-        log(f"  [WS] send event from data/ws_config.json: {send_event}")
+        log(f"  [WS] explicit experimental socket event: {send_event}")
     def with_base(template):
         """Apply the harness/proxy base (the stand-in lives on 127.0.0.1)."""
         if template and ws_http_base:
             return dict(template, base=ws_http_base)
         return dict(template or {})
 
-    http_send = with_base(learned.get("http_send"))
+    stored_template = (learned.get("http_send")
+                       if learned.get("http_send_verified") else {})
+    http_send = with_base(stored_template)
+    if learned.get("http_send") and not learned.get("http_send_verified"):
+        log("  [WS] ignoring an unverified/legacy request template; a page send "
+            "must be observed before backend replay")
     if http_send:
-        log(f"  [WS] the site's own send request is known: "
+        log(f"  [WS] a verified page request template is configured: "
             f"{http_send.get('method')} {http_send.get('url')}"
             + (f" (routed to {ws_http_base})" if ws_http_base else ""))
 
@@ -280,12 +286,14 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
     log(f"[Session] running {account.get('email')} over WebSocket (session-only)")
 
     def remember_http_send(template):
-        """Persist the site's own send request the moment it is seen."""
+        """Persist the observed page request template for later inspection/replay."""
         nonlocal http_send
-        http_send = dict(template or {})       # saved as learned (real hostname)
-        save_ws_config(http_send=http_send)
-        log(f"  [WS] saved the site's own send request to data/ws_config.json "
-            f"({template.get('method')} {template.get('url')})")
+        http_send = dict(template or {})       # keep the observed page URL
+        live_observation = not bool(ws_http_base)
+        save_ws_config(http_send=http_send, http_send_verified=live_observation)
+        status = "verified live-page observation" if live_observation else "mock-only observation"
+        log(f"  [WS] saved the observed send request template ({status}) to "
+            f"data/ws_config.json ({template.get('method')} {template.get('url')})")
     automation = build_automation(account, headless=headless, thread_id=thread_id,
                                   log=log)
     chat = None
@@ -305,9 +313,10 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
                 context = None
         automation.context = context
 
-        # The account's anti-detect layer before the site is touched, exactly
-        # like a normal run — the page is the session holder, and the socket
-        # then reuses the cookies that the restored session provided.
+        # Apply the account's browser identity before touching the app. The
+        # restored page session is also the source for the configured cookie
+        # header attached to the socket request; this code path does not by
+        # itself establish how the live service authenticates that socket.
         try:
             from browser.browser_engine import apply_chromium_stealth
             _kwargs, _fingerprint = automation._identity_context_options()
@@ -343,14 +352,14 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
                 candidates = probe_send_events_from_page(page, log=log)
                 if candidates and not send_event:
                     send_event = candidates[0]
-                    log(f"  [WS] probe chose the send event: {send_event}")
+                    log(f"  [WS] probe found a candidate socket event: {send_event}")
             except Exception as error:
                 log(f"  [WS] probe failed: {error}")
 
-        # The capture shows the site writes messages out of band and only
-        # listens on the socket; this sniffer catches that very request when the
-        # page sends one (the DOM fallback below), so replies can move to the
-        # backend from the next message on.
+        # The supplied WS entry does not include a client chat-send frame, but
+        # it also does not identify the out-of-band write request. This sniffer
+        # can observe a page send (including the DOM fallback) and make its
+        # request template available for the backend adapter.
         sniffer = SendRequestSniffer(log=log, conversation_id=chat_conversation_id,
                                      on_template=remember_http_send)
         sniffer.install(context)
@@ -396,19 +405,19 @@ def run_account_ws(account, *, headless=True, minutes=30.0, thread_id=1, log=pri
                     log(f"  [WS] dom fallback could not type the reply: {reply}")
                     return
                 counts["messages_out"] += 1
-                # The page writes the message out of band; remember the text so
-                # its echo is not mistaken for a new SMS.
+                # Remember the text while the page's send request is observed,
+                # so a matching echo is not mistaken for a new SMS.
                 try:
                     chat.note_sent_text(reply)
                 except Exception:
                     pass
                 log(f"  [REPLY] bot: {reply}   (dom fallback)")
-                # That request is the site's own send path: once seen, the next
-                # reply can be written from the backend without typing anything.
+                # If a request template was observed, the backend can use it for
+                # later replies; verify the target before using it against live.
                 if not chat.http_send and sniffer is not None and sniffer.wait(3.0):
                     chat.set_http_send(with_base(sniffer.template))
-                    log("  [WS] the site's own send request is known — the next reply "
-                        "goes from the backend")
+                    log("  [WS] a page send request template was learned — a later "
+                        "reply can use the backend adapter")
             except Exception as error:
                 log(f"  [WS] dom fallback failed: {error}")
 
@@ -580,13 +589,13 @@ def main() -> int:
                     help="show the session plan without starting a browser")
     ap.add_argument("--transport", choices=("dom", "ws"), default="dom",
                     help="dom = read/type in the page (default), "
-                         "ws = receive over Socket.IO; send via the site's HTTP request")
+                         "ws = receive over Socket.IO; replay a configured page request if available")
     ap.add_argument("--ws-url", default=None,
                     help="override the socket URL (default: api.chitchat.gg)")
     ap.add_argument("--ws-send-event", default="",
-                    help="experimental Socket.IO emit name (not the captured send path)")
+                    help="explicit experimental Socket.IO event name (unverified)")
     ap.add_argument("--ws-probe", action="store_true",
-                    help="inspect candidate Socket.IO emits for other builds")
+                    help="opt into trying candidate Socket.IO events (experimental/unverified)")
     ap.add_argument("--no-dom-fallback", action="store_true",
                     help="do not type into the page when the socket cannot confirm")
     ap.add_argument("--delay", type=float, default=5.0,

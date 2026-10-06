@@ -1,10 +1,10 @@
-"""Local chitchat.gg stand-in: pages + a real HTTP chat backend.
+"""Local chitchat.gg stand-in: test pages + a local HTTP mock backend.
 
 Two pieces:
 
-* :class:`ChatBackend` — a thread-safe message store.  Every participant
-  (the bot's browser, the "stranger" browser, any test client) reads/writes it
-  over plain HTTP, exactly like a real chat server.
+* :class:`ChatBackend` — a thread-safe message store. Every participant (the
+  bot's browser, the "stranger" browser, any test client) reads/writes it over
+  the mock HTTP API, allowing the client pipeline to be tested offline.
 * :func:`page_html` — the three pages the bot needs:
   ``/`` (home, "Start Text Chat" button), ``/start/new`` (captcha gate that
   hands over to the chat) and ``/chat/`` (the chat UI whose markup matches
@@ -90,7 +90,7 @@ class ChatBackend:
             return str(self._conversation_id)
 
     def register_tokens(self, mapping: Dict[str, str]) -> None:
-        """Map a session token to the account it belongs to (like the real site)."""
+        """Register the local mock's token-to-test-account mapping."""
         with self._lock:
             self._tokens.update({str(k): str(v) for k, v in (mapping or {}).items() if k})
 
@@ -103,7 +103,7 @@ class ChatBackend:
             return dict(self._api_send_template) if self._api_send_template else None
 
     def sender_for_token(self, token: Any, *, fallback: str = "") -> str:
-        """Who does this token belong to? (the real site reads its session)."""
+        """Resolve a token using the local mock's test-account mapping."""
         value = str(token or "").strip()
         if value:
             with self._lock:
@@ -297,10 +297,10 @@ _CHAT_BODY = """
     return true;
   }
 
-  // The real site does NOT send chat text over the socket: the message is
-  // written out of band (HTTP POST) and the socket only *listens* for it coming
-  // back.  The mock page does the same, so the backend has to learn that
-  // request (or its own socket emit is simply ignored — exactly like the site).
+  // The mock intentionally models chat writes as HTTP POSTs and uses the socket
+  // for incoming events/echoes. The supplied live WS entry has no client send
+  // frame, but does not show the other requests or establish the live write
+  // transport, nor what the real server would do with a socket send.
   function newNonce() {
     var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
     var out = '';
@@ -320,8 +320,8 @@ _CHAT_BODY = """
   }
 
   function connectSocket() {
-    // WS_URL already carries ?EIO=4&transport=websocket; only the mock identity
-    // hint is added (the real site has the token cookie instead).
+    // WS_URL already carries ?EIO=4&transport=websocket; the mock adds its
+    // identity hint. The supplied live WS entry does not establish auth details.
     var url = WS_URL + (WS_URL.indexOf('as=') >= 0 ? ''
                         : (WS_URL.indexOf('?') >= 0 ? '&' : '?')
                           + 'as=' + encodeURIComponent(ME));
@@ -445,8 +445,8 @@ _CHAT_BODY = """
   if (TRANSPORT === 'ws' && WS_URL && CONNECT_SOCKET) {
     connectSocket();
   } else if (TRANSPORT === 'ws' && WS_URL) {
-    // The real page also has a socket, but a WS-only test may disable it: the
-    // page then only writes messages (HTTP) and never listens on a socket.
+    // This mock page normally has a socket, but a WS-only test may disable it:
+    // the page then only writes messages (HTTP) and never listens on a socket.
     status.textContent = 'page socket disabled (message writes still go out)';
   } else {
     setInterval(poll, 700);
@@ -459,7 +459,7 @@ _CHAT_BODY = """
     if (!text) { return; }
     el.value = '';
     if (TRANSPORT === 'ws' && WS_URL) {
-      // like the real site: out of band (HTTP), the socket only listens
+      // This mock uses an out-of-band HTTP write; the socket handles receives.
       sendViaHttp(text);
       return;
     }
@@ -605,7 +605,7 @@ def make_handler(backend: ChatBackend,
             return self._send(404, b"not found")
 
         def _author_from_cookie(self):
-            """The session cookie names the sender (the real site reads it too)."""
+            """Read the sender label from the local mock's test cookie."""
             cookie = self.headers.get("Cookie") or ""
             for part in cookie.split(";"):
                 name, _, value = part.strip().partition("=")
@@ -637,7 +637,7 @@ def make_handler(backend: ChatBackend,
                 backend.note_dump(payload.get("author") or "bot", payload.get("html"))
                 return self._json({"ok": True})
             if parsed.path == "/api/conversations/send":
-                # the site's own out-of-band write (the socket only carries the echo)
+                # the mock page's HTTP write (the mock socket carries the echo)
                 author = backend.sender_for_token(
                     payload.get("token"),
                     fallback=str(payload.get("author") or self._author_from_cookie()))

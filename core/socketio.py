@@ -1,11 +1,12 @@
 """A dependency-free Engine.IO v4 + Socket.IO client (stdlib only).
 
-chitchat.gg uses
+The observed endpoint is
 ``wss://api.chitchat.gg/socket.io/?EIO=4&transport=websocket`` (see
-``docs/WS_CHAT_PROTOCOL.md``). The captured socket carries match/message events,
-presence and server echoes; the captured site writes chat text through its own
-HTTP request, not a client chat-send frame. ``core.chat_ws`` combines this
-receive/echo channel with the learned HTTP send request.
+``docs/WS_CHAT_PROTOCOL.md``). The supplied WS entry carries match/message
+events, presence and server echoes, with no client chat-send frame. It does not
+show the other requests or establish the site's write transport or socket
+authentication method. ``core.chat_ws`` combines this receive channel with
+optional configured send adapters.
 
 This low-level client implements the observed handshake and heartbeat on top of
 :mod:`socket` + :mod:`ssl` — no new dependency for the Windows build:

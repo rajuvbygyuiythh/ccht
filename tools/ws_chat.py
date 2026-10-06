@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read chat events over Socket.IO; send using the site's learned HTTP request.
+"""Read chat events over Socket.IO and use configured send adapters.
 
     python3 tools/ws_chat.py --list                       # which saved sessions exist
     python3 tools/ws_chat.py --account EMAIL --listen      # watch the live socket
@@ -10,12 +10,15 @@
     python3 tools/ws_chat.py --identity --account EMAIL    # read the username off the app
     python3 tools/ws_chat.py --bundle js-direct-chat.js    # inspect send clues
 
-The captured build receives match/messages/echoes on
-``wss://api.chitchat.gg/socket.io/?EIO=4&transport=websocket``.  It has no
-client chat-send frame: the app writes text through an HTTP request, learned by
-the page request sniffer and replayed from the backend.  ``--probe`` only
-inspects optional Socket.IO emit names for experiments/other builds; it cannot
-recover an event absent from the capture.  See ``docs/WS_CHAT_PROTOCOL.md``.
+The supplied WebSocket entry contains receive events and echoes but no
+client-side chat-send frame. It omits the other network requests, so it does not
+identify the write endpoint or authentication method. This CLI can replay an
+HTTP template learned from the page; verify it against a sanitized Fetch/XHR
+capture before treating it as the live site's send path. Without a request
+template, the client does not guess a Socket.IO send event. ``--probe``,
+``--send-event`` and ``--no-http-send`` explicitly opt into experimental,
+unverified socket sends; a bundle name alone cannot prove server acceptance.
+See ``docs/WS_CHAT_PROTOCOL.md``.
 """
 
 from __future__ import annotations
@@ -81,18 +84,26 @@ def remember_config(**updates) -> None:
 
 
 def describe_config(config: Dict[str, Any]) -> None:
-    """Print what the bot already knows about this site/account."""
+    """Print learned request settings and distinguish event candidates."""
     log("[WS] learned settings:")
-    log(f"  send event : {config.get('send_event') or '<unknown>'}")
+    verified_event = (config.get("send_event")
+                      if config.get("send_event_verified") else "")
+    candidate_event = config.get("send_event_candidate")
+    if not verified_event and config.get("send_event"):
+        # Older config files stored bundle guesses in this field without proof.
+        candidate_event = candidate_event or config.get("send_event")
+    log(f"  verified socket event : {verified_event or '<none>'}")
+    log(f"  unverified candidate  : {candidate_event or '<none>'}")
     template = config.get("http_send") or {}
     if template:
-        log(f"  http send  : {template.get('method')} {template.get('url')}")
+        state = "verified" if config.get("http_send_verified") else "unverified/legacy; ignored by live runner"
+        log(f"  HTTP request ({state}): {template.get('method')} {template.get('url')}")
         log(f"               content={template.get('content_field')!r} "
             f"nonce={template.get('nonce_field') or '-'} "
             f"conversation={template.get('conversation_field') or '-'}")
     else:
-        log("  http send  : <not learned yet> (it is learned automatically the "
-            "first time the page sends a message)")
+        log("  HTTP request : <not learned yet> (a page send can teach the template; "
+            "verify it before live replay)")
     log(f"  username   : {config.get('username') or '<unknown>'}")
 
 
@@ -368,15 +379,14 @@ def har_report(path: str) -> int:
                 pass
             log(f"    raw:   {frame[:200]}")
     else:
-        log("✗ no client-side chat *send* frame in this capture (only handshake,")
-        log("  presenceSync and pongs) — so the site does NOT send chat text over")
-        log("  this socket: it writes the message out of band (HTTP) and hears the")
-        log("  echo back over the socket.  The bot learns that request and replays it")
-        log("  (see docs/WS_CHAT_PROTOCOL.md, 'sending a message').")
-        log("  To nail an exact socket send event (if the site also accepts one), in DevTools →")
-        log("  Network → WS, click the socket, then type + send one message and")
-        log("  export the HAR again; or run --probe on a machine that can reach the")
-        log("  site (it reads the event name straight out of the chat bundle).")
+        log("✗ no client-side chat *send* frame in this WebSocket entry (only")
+        log("  handshake, presenceSync and pongs). This shows chat text was not")
+        log("  sent on this socket; this entry does not show which other request")
+        log("  wrote it or how the socket authenticates.")
+        log("  To identify the write path, include the outgoing Fetch/XHR request")
+        log("  from the full HAR or let SendRequestSniffer observe a page send.")
+        log("  Share only method, URL path, body field names and header names;")
+        log("  redact cookie, authorization, CSRF and other credential values.")
     for frame in recvs[:3]:
         if frame.startswith("42["):
             log(f"\nfirst server event frame: {frame[:200]}")
@@ -394,8 +404,8 @@ def bundle_report(path: str) -> int:
         log("  (none found — is this the right bundle?)")
     clues = http_send_clues(text)
     log("")
-    log("candidate HTTP send endpoints in the bundle (the capture shows the site")
-    log("sends chat text out of band and only listens on the socket):")
+    log("HTTP send endpoint clues in this bundle (heuristic only; the supplied")
+    log("WebSocket entry does not include or identify the message-write request):")
     for clue in clues:
         log(f"  {clue}")
     if not clues:
@@ -420,21 +430,31 @@ def run_live(args) -> int:
         f"({len(header.split(';')) if header else 0} for chitchat.gg)")
 
     config = ws_config()
-    send_event = args.send_event or config.get("send_event") or ""
+    saved_event = (config.get("send_event")
+                   if config.get("send_event_verified") else "")
+    # A bundle-derived candidate (including legacy config values) is not sent
+    # automatically. Reusing a saved event requires an explicit socket-mode flag.
+    send_event = args.send_event or (saved_event if args.no_http_send else "") or ""
     if send_event:
-        log(f"[WS] send event: {send_event} (from {'--send-event' if args.send_event else 'data/ws_config.json'})")
-    http_send = dict(config.get("http_send") or {}) if not args.no_http_send else {}
+        source = "--send-event" if args.send_event else "verified local config"
+        log(f"[WS] explicit socket event: {send_event} ({source})")
+    stored_template = config.get("http_send") or {}
+    http_send = (dict(stored_template)
+                 if config.get("http_send_verified") and not args.no_http_send else {})
+    if stored_template and not config.get("http_send_verified") and not args.no_http_send:
+        log("[WS] ignoring an unverified/legacy HTTP template; learn the request from "
+            "the live page before replay")
     if http_send:
-        log(f"[WS] the site's own send request is known: "
+        log(f"[WS] verified HTTP request template: "
             f"{http_send.get('method')} {http_send.get('url')} "
-            f"(replies go out that way, --no-http-send forces the socket)")
+            f"(backend replay enabled; --no-http-send opts into socket mode)")
 
     chat = ChatWebSocket(
         cookie_header=header,
         url=args.url or config.get("url") or DEFAULT_WS_URL,
         my_username=args.username or config.get("username") or "",
         send_event=send_event,
-        allow_probe=args.probe,
+        allow_probe=bool(args.probe or args.no_http_send),
         log=log,
         on_message=lambda text, _msg: log(f"[SMS]   user: {text}"),
         on_match=lambda match: log("[WS] match is live — you can chat now"),
@@ -465,6 +485,8 @@ def run_live(args) -> int:
     if args.send:
         ok, how = chat.send_message(args.send)
         log(f"[WS] {'✓ sent' if ok else '✗ not confirmed'} ({how})")
+        if ok and chat.sent_event:
+            save_ws_config(send_event=chat.sent_event, send_event_verified=True)
         if not args.keep_open:
             stop.set()
 
@@ -511,8 +533,8 @@ def start_reply_bot(chat: ChatWebSocket, stop: threading.Event) -> None:
             return
         ok, how = chat.send_message(reply)
         log(f"[REPLY] bot: {reply}  ({'confirmed' if ok else 'NOT confirmed'} · {how})")
-        if ok:
-            save_ws_config(send_event=chat.sent_event)
+        if ok and chat.sent_event:
+            save_ws_config(send_event=chat.sent_event, send_event_verified=True)
 
     chat.on_message = answer
 
@@ -590,7 +612,7 @@ def probe_in_browser(account: Dict[str, Any], log_fn) -> List[str]:
         from core.chat_ws import probe_send_events_from_page
         names = probe_send_events_from_page(page, log=log_fn)
         if names:
-            save_ws_config(send_event=names[0])
+            save_ws_config(send_event_candidate=names[0])
         return names
     except Exception as error:
         log_fn(f"[WS] probe failed: {type(error).__name__}: {error}")
@@ -616,13 +638,13 @@ def main() -> int:
     parser.add_argument("--reply", action="store_true",
                         help="answer incoming messages with ChatRuleBot")
     parser.add_argument("--no-http-send", action="store_true",
-                        help="ignore the learned HTTP send request (force the socket)")
+                        help="disable HTTP replay and explicitly opt into experimental socket sends")
     parser.add_argument("--forget-config", action="store_true",
-                        help="drop everything learned (send event + HTTP send) and exit")
+                        help="drop request templates, event candidates and username, then exit")
     parser.add_argument("--probe", action="store_true",
-                        help="inspect candidate Socket.IO emits (experimental; not capture-proven)")
+                        help="opt into experimental candidate Socket.IO sends (unverified)")
     parser.add_argument("--send-event", default="",
-                        help="experimental Socket.IO emit override")
+                        help="explicit experimental Socket.IO event name (unverified)")
     parser.add_argument("--username", default="", help="this account's own username")
     parser.add_argument("--url", default="", help=f"socket URL (default {DEFAULT_WS_URL})")
     parser.add_argument("--minutes", type=float, default=0.0, help="stop after N minutes")
@@ -636,8 +658,7 @@ def main() -> int:
                              "one-time; remembered in data/ws_config.json)")
     parser.add_argument("--bundle", default="", help="rank emit names in a saved JS bundle")
     parser.add_argument("--show-config", action="store_true",
-                        help="print what the bot learned (send event, HTTP send, "
-                             "username) and exit")
+                        help="show the request template and verified/unverified event names, then exit")
     args = parser.parse_args()
 
     if args.list:
@@ -659,8 +680,10 @@ def main() -> int:
         describe_config(ws_config())
         return 0
     if args.forget_config:
-        save_ws_config(send_event="", http_send={}, username="")
-        log("[WS] forgotten: send event, HTTP send request, username")
+        save_ws_config(send_event="", send_event_verified=False,
+                       send_event_candidate="", http_send={},
+                       http_send_verified=False, username="")
+        log("[WS] forgotten: send events, HTTP request template, username")
         return 0
     return run_live(args)
 

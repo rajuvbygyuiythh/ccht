@@ -19,13 +19,14 @@ Usage:
     python3 tools/e2e_mock_chat.py                       # synthetic mock session, headless
     python3 tools/e2e_mock_chat.py --session /path/to/account_session
     python3 tools/e2e_mock_chat.py --log /tmp/e2e.log --visible
-    python3 tools/e2e_mock_chat.py --transport ws        # socket receive + HTTP send
+    python3 tools/e2e_mock_chat.py --transport ws        # mock socket receive + mock HTTP send
 
-``--transport ws`` keeps the same session/identity/fingerprint steps but uses
-the WebSocket stand-in (``tools/mock_chitchat/ws_server.py``, Engine.IO v4 +
-Socket.IO) for incoming messages and server echoes. The bot replies through the
-site's learned HTTP request; the blind-page mode proves the bot does not need to
-see the user's text in its page or open a page socket.
+``--transport ws`` keeps the session/identity/fingerprint steps but uses the
+mock WebSocket stand-in (``tools/mock_chitchat/ws_server.py``, Engine.IO v4 +
+Socket.IO) for incoming messages and echoes. The bot exercises its learned
+request adapter against the mock HTTP API. The blind-page mode proves, within
+this harness, that the bot need not see the user's text in its page or open a
+page socket; it does not establish the live site's send endpoint or auth method.
 """
 
 from __future__ import annotations
@@ -633,14 +634,14 @@ def main() -> int:
                         help="absolute safety stop in seconds (0 = minutes*60+150); "
                              "artifacts are written before exiting")
     parser.add_argument("--transport", choices=("dom", "ws"), default="dom",
-                        help="dom = page polling (default), ws = backend Socket.IO receive "
-                             "with the site's HTTP send request")
+                        help="dom = page polling (default), ws = mockable backend Socket.IO "
+                             "receive + configured HTTP send adapter")
     parser.add_argument("--ws-send-event", default="",
                         help="experimental Socket.IO emit override (not the captured send path)")
     parser.add_argument("--bot-page-blind", action="store_true",
                         help="with --transport ws: hide user messages from the bot's "
-                             "page and open no page socket; proves detection uses "
-                             "backend Socket.IO events (replies still use HTTP)")
+                             "page and open no page socket; within this mock test, "
+                             "detect with backend Socket.IO events")
     args = parser.parse_args()
     ws_mode = args.transport == "ws"
 
@@ -723,16 +724,16 @@ def main() -> int:
                 if cookie.get("name"):
                     ws_saved_cookie_names.add(str(cookie["name"]))
                 if cookie.get("value") and len(str(cookie["value"])) >= 6:
-                    # The real socket is authenticated by the cookie jar, not by
-                    # a single specially-named cookie, so every saved cookie
-                    # value maps to this account on the stand-in.
+                    # The mock maps saved cookie values to this synthetic/test
+                    # account so cookie propagation can be exercised. This is
+                    # not evidence of the live socket's auth mechanism.
                     token_map[str(cookie["value"])] = str(account["_display_name"])
                 if str(cookie.get("name")) == "token" and cookie.get("value"):
                     session_token = str(cookie["value"])
         except Exception as error:
             log(f"[MockWS] could not read the session cookies: {error}")
-        # The pages and the backend identify themselves by the session token,
-        # exactly like the real site reads the account from its cookie jar.
+        # The local mock uses these synthetic/session cookie values to map a
+        # test client to its account label. The live auth flow is not modeled.
         try:
             backend.register_tokens(token_map)
             log(f"[MockSite] {len(token_map)} session token(s) map to an account "
@@ -742,11 +743,9 @@ def main() -> int:
         ws_server = ChitchatSocketServer(log=log, ping_interval=25.0,
                                          token_map=token_map,
                                          accept_socket_sends=False)
-        # The real server hears a message t=False)
-        # The real server hears a message the moment it is written *out of band*
-        # and broadcasts it to the sockets — the capture shows exactly that (the
-        # sender's own text comes back as a chatMessage with its nonce).  The
-        # mock backend therefore feeds the socket stand-in.
+        # The mock bridges its HTTP backend to the socket stand-in. The
+        # supplied live WS entry shows received messages with nonces, but does
+        # not include the corresponding live write request.
         def _bridge(message):
             try:
                 ws_server.publish(dict(message))
@@ -754,15 +753,15 @@ def main() -> int:
                 log(f"[MockWS] bridge failed: {error}")
 
         backend.on_message_added(_bridge)
-        log("[MockWS] the mock backend now feeds the socket stand-in "
-            "(out-of-band HTTP messages reach the sockets)")
+        log("[MockWS] the mock HTTP backend now broadcasts its test messages "
+            "to the socket stand-in")
         ws_backend_url = ws_server.start()
         ws_server.conversation_id = backend.conversation()
         log(f"[MockWS] conversation id shared with the pages: {ws_server.conversation_id}")
         ws_page_url = ws_backend_url
         log("[MockWS] the chat socket stand-in is listening at "
-            f"{ws_backend_url} (Engine.IO v4 + Socket.IO, the frames captured "
-            "from the real site)")
+            f"{ws_backend_url} (Engine.IO v4 + Socket.IO frame shapes based on "
+            "the anonymized capture fixture)")
         # The mock pages are served over https, so a plain ws:// dial is blocked
         # by mixed content + Local Network Access rules; these two switches lift
         # that for the local stand-in only (a test-harness concern, not the bot).
@@ -773,15 +772,14 @@ def main() -> int:
         os.environ["EVA_CHROMIUM_EXTRA_ARGS"] = (
             (os.environ.get("EVA_CHROMIUM_EXTRA_ARGS", "") + " " + ws_extra).strip())
         ws_page_url = ws_backend_url
-        log("[MockWS] STRICT mode: chat frames sent over the socket are ignored "
-            "(the capture shows the site writes messages out of band and only "
-            "listens on the socket) — a reply can only arrive through the site's "
-            "own HTTP send request + the broadcast back over the socket")
+        log("[MockWS] STRICT mode: socket chat frames are ignored by mock-test "
+            "design; this does not establish how the live server handles them. "
+            "Replies in this harness use the mock HTTP API and mock socket echo.")
         log(f"[MockWS] the mock pages dial the stand-in directly "
             f"({ws_page_url}) so both browsers use a real socket; the browser is "
             f"started with {ws_extra}")
-        log(f"[MockWS] identity: the account's own token cookie maps to "
-            f"{account['_display_name']!r} — both sockets prove cookie auth")
+        log(f"[MockWS] identity mapping: the configured token cookie maps to "
+            f"{account['_display_name']!r} on the local stand-in")
         captured["ws_session_token"] = session_token
 
     # -- route hook for the bot's own browser ----------------------------- #
@@ -796,12 +794,11 @@ def main() -> int:
     log(f"[E2E] loaded browser.browser_automation ({how})")
 
     def ws_prepare_context(context, who, log_fn):
-        """Let the mock page reach the local socket + hand it the session token.
+        """Let the mock page reach the local socket and map its test identity.
 
-        The account's cookies belong to app.chitchat.gg, so the *page's* socket
-        handshake to 127.0.0.1 would look anonymous; the account's own token
-        cookie is added for the stand-in's origin, so both sockets identify the
-        account exactly like the real site does (by the token).
+        The saved app cookies do not belong to the local stand-in origin. For
+        this test only, its configured token value is added as a cookie for the
+        local server; this mock mapping does not model or prove live auth.
         """
         try:
             context.grant_permissions(["local-network-access"],
@@ -854,7 +851,7 @@ def main() -> int:
                 if args.bot_page_blind and ws_mode:
                     log("[MockSite] BLIND bot page: the user's messages are never "
                         "served to this context and the page opens no socket (it "
-                        "still writes through the site's own HTTP request) — the "
+                        "still uses the mock page's HTTP send request) — the "
                         "account's only socket is the backend client")
                 log("[MockSite] ✓ route hook installed on the account's browser context")
                 # Watch every page this account opens (console/errors/network).
@@ -1112,20 +1109,20 @@ def main() -> int:
     }
     if ws_mode:
         checks.update({
-            "engine.io + socket.io handshake completed": has("[WS] socket.io connected"),
-            "the restored session cookies went out on the socket handshake":
+            "Engine.IO + Socket.IO handshake with the mock completed": has("[WS] socket.io connected"),
+            "a saved-session cookie reached the mock socket handshake":
                 bool(ws_cookie_hits),
-            "the account identity came from its own session (cookie auth)":
+            "the mock mapped the configured session to the test identity":
                 has("[WS] matchUpdate") and bot_name in ws_participants,
-            "incoming SMS was read from chatMessage events":
+            "incoming test SMS was read from chatMessage events":
                 ws_events.get("chatMessage", 0) >= 2 and has("[WS] incoming SMS from"),
-            "the reply was confirmed by the server echo":
+            "the mock echo matched the reply nonce":
                 has("delivery confirmed"),
-            "the site's own send request was learned from the page":
-                has("learned the site's own send request"),
-            "a reply left the backend through the site's own HTTP request":
+            "a page send request template was learned in the mock":
+                has("learned a page send request template"),
+            "the backend sent the reply through the mock HTTP adapter":
                 has("[WS] sent over HTTP"),
-            "the chat closure travelled over the socket":
+            "the mock chat closure travelled over the socket":
                 has("[WS] the chat was closed") or has("[WS] matchUpdate"),
         })
         if blind_proof["enabled"]:

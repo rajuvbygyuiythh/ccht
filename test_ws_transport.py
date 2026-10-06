@@ -137,9 +137,9 @@ def test_socket_client():
         check("presenceSync is answered with onlineFriends",
               any(e == "onlineFriends" for e, _ in events), str(events))
 
-        check("the server received the session cookies",
+        check("the mock server received the configured cookie header",
               any("token=REALTOKEN" in str(c.get("cookie")) for c in server.clients))
-        check("the server recognised the account from the token",
+        check("the mock server mapped the token to a test identity",
               [c["username"] for c in server.clients] == ["sadia.6.7"],
               str([c["username"] for c in server.clients]))
 
@@ -154,7 +154,7 @@ def test_socket_client():
         deadline = time.time() + 3
         while time.time() < deadline and not any(e == "chatMessage" for e, _ in events):
             time.sleep(0.05)
-        check("the server echoes chatMessage back",
+        check("the mock server echoes chatMessage back",
               any(e == "chatMessage" for e, _ in events), str([e for e, _ in events]))
 
         stats = client.stats()
@@ -202,7 +202,12 @@ def test_chat_ws_flow():
                          log=log, echo_timeout=2.0,
                          on_message=lambda text, _raw: incoming.append(text))
     chat.start()
-    check("the session-authenticated socket connects", chat.wait_connected(5.0))
+    check("the socket connects with a cookie header configured", chat.wait_connected(5.0))
+    ok, how = chat.send_message("must not be guessed")
+    check("an unconfigured socket chat-send event fails closed",
+          not ok and "unverified" in how and not server.messages, how)
+    # This next send is an explicit mock-only event test, not live protocol evidence.
+    chat.send_event = "chatMessage"
     # The socket identity (pid) is matched against the match participants, so the
     # name is known as soon as the matchUpdate arrives — or straight away when
     # the caller passes --username (the browser knows it from the profile).
@@ -246,9 +251,9 @@ def test_chat_ws_flow():
         return bool(predicate())
 
     ok, how = chat.send_message("hey there")
-    check("the reply is confirmed by the server echo", ok and "chatMessage" in how, how)
+    check("the mock reply echo is recognized", ok and "chatMessage" in how, how)
     check("the confirmed event is remembered", chat.sent_event == "chatMessage")
-    check("our message is counted once (from the server echo)",
+    check("our message is counted once (from the mock echo)",
           chat.messages_out == 1, str(chat.messages_out))
     check("the raw sent frame is recorded too",
           any("hey there" in frame for frame in chat.client.sent_frames),
@@ -366,7 +371,7 @@ def test_har_dump_replay():
 
 
 # --------------------------------------------------------------------------- #
-#  the site's own send path (HTTP out of band) — the capture's real mechanism
+#  configured HTTP send adapter + socket echo (local test harness)
 # --------------------------------------------------------------------------- #
 
 def _http_recorder(store):
@@ -482,7 +487,7 @@ def test_http_send_request():
         check("the nonce went out", sent.get("nonce") == "NONCE0000000000000001", sent)
         check("the conversation went out",
               sent.get("conversationId") == "6ac520e70eaa4314c239e5df", sent)
-        check("the session cookie authenticated the request",
+        check("the configured cookie header reached the local test endpoint",
               "token=abc123" in str(store[0]["headers"].get("Cookie") or ""),
               store[0]["headers"].get("Cookie"))
         check("the base hook redirected the request to the local server",
@@ -498,8 +503,8 @@ def test_http_send_request():
 
 
 def test_http_send_over_http_with_echo():
-    """The captured mechanism: socket ignores the send, HTTP writes it, echo confirms."""
-    print("\n[out-of-band send + socket echo]")
+    """The strict mock contract: HTTP request, then socket echo confirms."""
+    print("\n[mock HTTP send + socket echo]")
     import json as _json
     import urllib.request
     from core.chat_ws import ChatWebSocket
@@ -514,7 +519,7 @@ def test_http_send_over_http_with_echo():
         chat.start()
         check("the socket connects", chat.wait_connected(5.0))
 
-        # the message log is fed by the out-of-band request, like the real server
+        # The strict mock's message log is fed by the local HTTP send request.
         def _out_of_band(text, nonce):
             server.publish({"author": "me", "id": _nanoid_len(text + nonce),
                             "text": text, "nonce": nonce})
@@ -549,9 +554,10 @@ def test_http_send_over_http_with_echo():
                                 "url": f"http://127.0.0.1:{httpd.server_address[1]}/send",
                                 "body": {"content": "", "nonce": ""},
                                 "content_field": "content", "nonce_field": "nonce"})
-            # a socket emit must NOT work in this mode (the real site ignores it)
+            # Strict mock mode drops socket sends by test design; this says
+            # nothing about how the live server handles them.
             ok, how = chat.send_message("over http", timeout=1.0)
-            check("the reply is sent out of band and confirmed by the echo",
+            check("the reply uses the mock HTTP adapter and mock echo",
                   ok and "http" in how, how)
             check("the request carried our nonce and text",
                   store and store[0].get("content") == "over http"
@@ -562,11 +568,13 @@ def test_http_send_over_http_with_echo():
         finally:
             httpd.shutdown()
 
-        # and the socket itself is strict: an emit is ignored by the stand-in
+        # Explicitly try one event against the strict mock. The supplied live
+        # capture does not show whether the real server accepts it.
         chat.set_http_send({})
+        chat.send_event = "chatMessage"
         before = len(server.messages)
         chat.send_message("straight over the socket", timeout=1.0)
-        check("the strict socket ignores a chat frame (as the site does)",
+        check("strict mock mode ignores a chat frame by test design",
               len(server.messages) == before, len(server.messages))
         chat.stop()
         time.sleep(0.3)
@@ -664,7 +672,7 @@ def test_har_replay():
 
 
 def test_probe_finds_the_event():
-    print("\n[send-event probing]")
+    print("\n[explicit send-event probing against mock]")
     server, url, _log = start_server()
     log = Quiet()
     chat = ChatWebSocket(url=url, cookie_header="token=REALTOKEN", log=log,
@@ -674,11 +682,11 @@ def test_probe_finds_the_event():
     check("it connects", chat.wait_connected(5.0))
     time.sleep(0.6)
     ok, how = chat.send_message("probing works")
-    check("an unknown event is skipped and a working one is found",
+    check("an unknown event is skipped and a mock-supported candidate is found",
           ok and chat.sent_event in ("chatMessage", "sendMessage"), how)
     check("the wrong event was reported honestly",
           log.has("no echo for notARealEvent"), "log: " + " | ".join(log.lines[-4:]))
-    check("the message still reached the server",
+    check("the test message reached the mock server",
           any(m["content"] == "probing works" for m in server.messages),
           str([m["content"] for m in server.messages]))
     chat.stop()

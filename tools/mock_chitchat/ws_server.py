@@ -234,9 +234,10 @@ class ChitchatSocketServer:
         self.ping_timeout = float(ping_timeout)
         self.token_map = dict(token_map or {})
         self.default_stranger = default_stranger
-        # The real capture shows the chat socket carrying no client chat frames,
-        # so a strict stand-in drops them (the message has to be written out of
-        # band, over HTTP, exactly like the site does).
+        # Strict mode drops socket chat sends as a mock test contract so the
+        # HTTP-adapter flow is exercised. The supplied live WS entry has no
+        # client chat-send frame, but does not prove the real server rejects one
+        # or establish that live writes use HTTP.
         self.accept_socket_sends = bool(accept_socket_sends)
         self.on_event = on_event
         self.conversation_id = "mock-" + _nanoid(10)
@@ -325,7 +326,7 @@ class ChitchatSocketServer:
                 "id": _nanoid(24), "pid": _nanoid(20), "sid": _nanoid(20)}
 
     def broadcast(self, event: str, payload: Any) -> None:
-        """Public broadcast, used to mirror out-of-band (HTTP) messages."""
+        """Broadcast mock-backend events to connected socket-test clients."""
         self._broadcast(event, payload)
 
     def _broadcast(self, event: str, payload: Any) -> None:
@@ -477,10 +478,10 @@ class ChitchatSocketServer:
             self.log(f"[MockWS] {who['username']} disconnected")
 
     def publish(self, message: Dict[str, Any]) -> None:
-        """Publish a message that was written out of band (HTTP), like the site.
+        """Mirror a mock HTTP-backend message onto the socket stand-in.
 
-        The message log belongs to the mock HTTP backend; this mirrors it onto the
-        sockets so both sides hear it as a normal ``chatMessage``.
+        The message log belongs to the mock HTTP backend; this broadcasts its
+        event shape so both test clients hear a normal ``chatMessage``.
         """
         author = str(message.get("author") or "?")
         text = str(message.get("text") or "")
@@ -544,8 +545,8 @@ class ChitchatSocketServer:
         if event in SEND_EVENTS:
             if not self.accept_socket_sends:
                 logger(f"[MockWS] {client['username']} sent {event} over the socket — "
-                       f"ignored (the real site writes messages out of band; the socket "
-                       f"only carries the echo back)")
+                       f"ignored by strict mock mode (this is a test contract, not "
+                       f"evidence about how the live server handles the event)")
                 return
             text = ""
             if isinstance(data, str):

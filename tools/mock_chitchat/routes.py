@@ -42,7 +42,7 @@ def install(context: Any,
     ``blind_others`` hides every other participant's message from *this*
     context's ``/api/messages`` (the page never renders them). The blind-page
     WebSocket detection test uses it so a reply can only have been triggered by
-    a backend socket event; the reply itself still uses the app's HTTP send path.
+    a backend socket event; the reply itself still uses the mock HTTP adapter.
     """
     stats = {"calls": 0, "cookies": 0}
 
@@ -126,11 +126,10 @@ def install(context: Any,
             backend.leave(payload.get("author"))
             return route.fulfill(status=200, json={"ok": True})
         if parsed.path == "/api/conversations/send" and request.method == "POST":
-            # The real site does not send chat text over the socket: it writes the
-            # message out of band (HTTP) and only *listens* on the socket for the
-            # echo.  This endpoint is that out-of-band write, so the bot can be
-            # tested against the real mechanism (it learns this request from the
-            # page and then replays it from the backend).
+            # This mock endpoint models an out-of-band HTTP write and broadcasts
+            # its echo over the socket. The supplied live WS entry has no client
+            # chat-send frame, but does not identify the actual write transport
+            # or prove how the real server handles socket sends.
             payload = request.post_data_json or {}
             author = backend.sender_for_token(payload.get("token"),
                                               fallback=str(payload.get("author") or who))
@@ -178,8 +177,8 @@ def install(context: Any,
         html = site.page_html(parsed.path, me=who, api_base=api_base, debug=debug,
                               ws_url=ws_url, transport=transport,
                               connect_socket=connect_socket)
-        # A tiny first-party cookie, like a real site sets on its own domain, so
-        # the pipeline's "save the session again" step has something to keep.
+        # A mock-only first-party cookie so the pipeline's session-save step
+        # has something to keep; it is not a real site's authentication token.
         cookie = f"mock_cc_session={random.randint(100000, 999999)}; Path=/; Max-Age=3600"
         route.fulfill(status=200, content_type="text/html; charset=utf-8", body=html,
                       headers={"Set-Cookie": cookie})

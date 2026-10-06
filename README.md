@@ -89,9 +89,9 @@ data/requirements.txt` → `python -m playwright install chromium`.
 | `python test_browser_identity.py` | identity (offline) | **207/207 passed** |
 | `python test_thread_scheduler.py` | runtime (offline) | **93/93 passed** |
 | `python test_mock_chitchat.py` | mock site + session import + debug layer | **56/56 passed** |
-| `python test_ws_transport.py` | chat transport + capture parsing | **107/107 passed** |
+| `python test_ws_transport.py` | chat transport + capture parsing | **108/108 passed** |
 | `python3 tools/e2e_mock_chat.py` | browser E2E (DOM transport) | not run here: Playwright/Chromium unavailable |
-| `python3 tools/e2e_mock_chat.py --transport ws --bot-page-blind` | backend-WebSocket detection proof; replies use HTTP | not run here: Playwright/Chromium unavailable |
+| `python3 tools/e2e_mock_chat.py --transport ws --bot-page-blind` | mock WebSocket-detection test; replies use the mock HTTP adapter | not run here: Playwright/Chromium unavailable |
 | `python tools/live_chat.py` | flow (default) | interactive REPL |
 
 ## Project layout
@@ -253,27 +253,26 @@ Full explanation (diagram + file-by-file table): **`docs/RUNTIME_AND_CHAT_FLOW.m
 ## Real browser end-to-end chat test (v2.7 — "acc er session diye chat kora jay?")
 
 chitchat.gg is not reachable from every machine/CI sandbox, so `tools/e2e_mock_chat.py`
-runs the **real pipeline** against a local stand-in of the site
-(`tools/mock_chitchat/`): real Chromium, the account's own Chrome profile, the
-saved cookies, the real chat reader and the real `ChatRuleBot`.  The bot keeps
-using `https://app.chitchat.gg/...` — a Playwright route hook answers those
-requests with the stand-in pages, so cookies and URL checks behave exactly like
-on the live site.
+runs the bot's **real client pipeline** against a local stand-in of the site
+(`tools/mock_chitchat/`): Chromium, the chat reader and `ChatRuleBot` are real;
+app pages, API responses and the socket server are mocked. A Playwright route
+hook serves the stand-in pages for `https://app.chitchat.gg/...`, exercising the
+browser/session plumbing without contacting the live service.
 
 ```bash
 python3 tools/e2e_mock_chat.py                     # full conversation (headless, ~45 s)
 python3 tools/e2e_mock_chat.py --connect-only      # connect test only: fingerprint + session
 python3 tools/e2e_mock_chat.py --session data/account_sessions/account_xxx --visible
 python3 tools/e2e_mock_chat.py --log /tmp/e2e.log  # transcript to a file
-# socket-only proof: blind bot page (no user text in its DOM, no page socket) +
-# cookie-authenticated backend socket + a real browser for the user side
+# mock socket-only detection test: blind bot page (no user text in its DOM,
+# no page socket) + synthetic mock session + browser for the user side
 python3 tools/e2e_mock_chat.py --transport ws --bot-page-blind --debug
 ```
 
-A **second real browser** plays the stranger: it types a message into the same
+A **second real browser** plays the stranger: it types a message into the mock
 chat, and the test passes only when the bot's reply is rendered in that user's
-window.  Nothing is stubbed — `tools/session_chat.py` drives
-`browser/browser_automation.py` unchanged.
+window. The browser automation and bot code are unchanged; the app service and
+socket are still test doubles.
 
 | Check (printed at the end of a run) | Meaning |
 |-------------------------------------|---------|
@@ -326,46 +325,49 @@ containers).  Both are optional; without them the bot behaves as before.
 
 ## Chat over the live WebSocket (v2.8 — "imporve web socket")
 
-The transport follows what the capture shows: after the saved session is
-restored, the backend socket receives match/message/typing events and own-message
-echoes. Chat text itself is written through the site's HTTP send request, which
-the page sniffer learns and the backend replays. Once that template is learned,
-new incoming SMS no longer need DOM polling or page typing for replies.
+The supplied WebSocket entry shows the backend receiving match/message/typing
+events and own-message echoes, with no outgoing chat-send frame on that socket.
+It does not include the other network requests, so it does not establish the
+write transport, HTTP endpoint, or socket authentication method. The project
+supports learning a page's outgoing request and replaying it from the backend;
+that implementation/mock flow is not evidence of the live endpoint until its
+Fetch/XHR request is captured. Once a valid template is learned, new incoming
+SMS no longer need DOM polling or page typing for replies.
 
 ```
 wss://api.chitchat.gg/socket.io/?EIO=4&transport=websocket
   0{…}            ← engine.io handshake (ping 25 s)
   40{release}     → handshake with the site's release id
-  ← 40{sid,pid}      the pid is a *session* id — the account is identified by
-                     its cookies and its own echo (never by this pid)
+  ← 40{sid,pid}      the pid is a *session* id, not an account id; this
+                     WebSocket entry does not show how the socket authenticates
   → 42["presenceSync"]
   ← 42["matchUpdate", {match:{conversation:{…}}}]     the chat to talk in
   ← 42["chatMessage", {message:{author, content}}]    incoming SMS
-  → (no chat frame: the site writes the message out of band over HTTP,
-     the socket only carries the echo back — capture-proven, see below)
+  → (no chat-send frame in this WS entry; the write request is not included)
   ← 42["chatMessage", …]                              the server echo = delivered
 ```
 
-The full capture (frames, payloads, the closure frame) is written down in
-`docs/WS_CHAT_PROTOCOL.md`.
+The anonymized fixture and the supplied WS-entry findings are documented in
+`docs/WS_CHAT_PROTOCOL.md`. The user's excerpt was not copied into the repo; it
+contains no Fetch/XHR message-send request.
 
 | File | Role |
 |------|------|
 | `core/socketio.py` | Engine.IO v4 + Socket.IO client, stdlib only (no new dependency for the Windows build), auto-reconnect + heartbeat |
-| `core/chat_ws.py` | chat layer: session cookies, incoming `matchUpdate`/`chatMessage`, learned HTTP send request, echo confirmation |
+| `core/chat_ws.py` | chat layer: configured session cookies, incoming `matchUpdate`/`chatMessage`, optional learned HTTP template, echo matching |
 | `tools/ws_chat.py` | CLI to replay HAR/plain dumps, listen, reply, inspect HTTP/Socket.IO send clues |
-| `tools/session_chat.py --transport ws` | browser holds the session; backend Socket.IO receives, learned HTTP request sends |
+| `tools/session_chat.py --transport ws` | browser holds the session; backend Socket.IO receives, configured request template sends (verify live request first) |
 | `tools/mock_chitchat/ws_server.py` | offline stand-in that speaks exactly those frames |
 
 ```bash
 # backend runner over the socket (headless by default)
-python tools/session_chat.py --account sadia.6.7@gmail.com --transport ws --minutes 30
+python tools/session_chat.py --account EMAIL --transport ws --minutes 30
 
 # watch a session's socket, or answer with ChatRuleBot
-python tools/ws_chat.py --account sadia.6.7@gmail.com --listen
-python tools/ws_chat.py --account sadia.6.7@gmail.com --reply
+python tools/ws_chat.py --account EMAIL --listen
+python tools/ws_chat.py --account EMAIL --reply
 python tools/ws_chat.py --account EMAIL --send "hi"        # one message
-python tools/ws_chat.py --account EMAIL --reply --probe    # inspect optional Socket.IO emit names
+python tools/ws_chat.py --account EMAIL --reply --probe    # explicitly try unverified socket-send candidates
 
 # report captured WS frames / inspect endpoint clues in the site bundle
 python tools/ws_chat.py --har ws.txt
@@ -383,30 +385,40 @@ python tools/ws_chat.py --identity --account EMAIL
 WS-only dump cannot reveal the HTTP message-send endpoint; include the Fetch/XHR
 request in a full capture or let the page sniffer learn it from an app send.
 
-**How a reply is sent (the capture's real mechanism).** The full capture contains
-*no* client chat frame at all — only the socket.io connect, `presenceSync` and
-pongs — while every message the account sent came back as a **received**
-`chatMessage` carrying the client's `nonce`.  The site therefore writes the
-message **out of band (HTTP)** and only listens on the socket.  The bot does the
-same and learns the request automatically:
+**What the supplied capture does—and does not—show.** The provided excerpt is
+one WebSocket request. Its client frames include the Socket.IO connect,
+`presenceSync` and pongs, but no chat-send frame; own messages arrive as
+**received** `chatMessage` frames carrying a nonce. This shows that chat text
+was not sent on this observed socket. Because the excerpt omits the other 166
+network entries, it does **not** prove that the message was sent over HTTP, show
+the write endpoint, or identify the socket's authentication mechanism.
 
-1. the first reply (or any reply typed into the page) is watched by
-   `core.chat_ws.SendRequestSniffer`, which records the app's own request —
-   method, URL, body, and which fields carry the text / nonce / conversation id;
-2. the request template and field names are persisted locally in
-   `data/ws_config.json`; the session cookie jar is loaded separately from the
-   saved browser state and attached by `send_template_request()` on each backend replay;
-3. delivery is only accepted when the server's echo of our message arrives over
-   the socket (`[WS] ✓ delivery confirmed by the server echo (http/200)`).
+The project supports an HTTP request template that the page's own send can
+teach to `core.chat_ws.SendRequestSniffer`. This describes the code path, not a
+write request visible in the supplied excerpt:
+
+1. a page send can be observed by `SendRequestSniffer`, which records the
+   request method, URL, body shape and fields for text / nonce / conversation;
+2. the request template is persisted locally in `data/ws_config.json`; request
+   headers and the browser's session state are sensitive local data. Mock-only
+   and legacy/unverified templates are not replayed by the standard live runner;
+3. backend replay and nonce-matched echo handling are implemented, but should
+   only be treated as the live send path after the actual Fetch/XHR request and
+   required authentication context have been verified.
 
 ```bash
-python tools/ws_chat.py --show-config       # what has been learned
-python tools/ws_chat.py --forget-config     # forget it and learn again
+python tools/ws_chat.py --show-config       # inspect locally learned config
+python tools/ws_chat.py --forget-config     # remove it and learn again
 ```
 
-A socket emit is still available as a last resort (`--no-http-send` forces it),
-and `--probe` / `--ws-send-event` keep working for a site that also accepts one
-— but on the captured build the HTTP path is the real one.
+`--no-http-send`, `--probe`, and `--ws-send-event` explicitly opt into
+experimental socket sends; without a verified HTTP template or opt-in, the
+client fails closed instead of guessing `chatMessage`. The supplied WS entry
+and bundle event names do not prove that the live server accepts socket chat
+sends. To verify the actual write path, inspect the matching outgoing Fetch/XHR request
+from the full capture. Share only its sanitized shape (method, URL path, body
+field names, and relevant header names)—never cookie, authorization, CSRF, or
+other credential values.
 
 `--transport dom` (the default) is unchanged: the DOM flow from v2.2–v2.7 still
 runs exactly as before.
@@ -422,32 +434,34 @@ session with a fake cookie; it does not need or commit a real account's
 `storage_state.json`. Pass `--session /path/to/local/session` only when you
 specifically want to exercise a private saved session.
 
-Same real pipeline (real Chromium, the test account profile, the saved mock
-cookie state, the stealth layer, `ChatRuleBot`), but the stand-in also runs the chat socket:
-**both** the bot's backend client **and** the two browser pages talk Engine.IO
-v4 + Socket.IO to it.  The added checks:
+The harness uses Chromium, the stealth layer and `ChatRuleBot`, but both browser
+pages and the backend socket connect to the **local mock stand-in**, not the live
+service. The added checks:
 
 | Check | What it proves |
 |-------|----------------|
-| engine.io + socket.io handshake completed | real socket, real frames |
-| the restored session cookies went out on the socket handshake | the socket is authenticated by `storage_state.json` (cookie/token only) |
-| the account identity came from its own session | the saved cookies + the account's own echo (the socket `pid` is only a session id) |
-| incoming SMS was read from `chatMessage` events | detection is socket-side, not DOM |
-| the reply was confirmed by the server echo | the reply really reached the server (echo matched by nonce) |
-| the site's own send request was learned from the page | the request the app uses is captured, field names and all |
-| a reply left the backend through the site's own HTTP request | the reply was written by the backend, not typed |
-| the chat closure travelled over the socket | `closure{closed:true}` handling |
+| Engine.IO + Socket.IO handshake with the mock completed | the client interoperates with the mock socket and its synthetic frames |
+| synthetic session cookie reached the mock handshake | the mock cookie plumbing works; it does not establish live-site authentication |
+| account identity came from the synthetic session | the fixture's own-session/echo matching works (the socket `pid` is not an account id) |
+| incoming SMS was read from `chatMessage` events | detection is socket-side in this test, not DOM |
+| the mock echo matched the reply nonce | the mock accepted the test reply and echo matching works |
+| a send request was learned from the mock page | the sniffer/template flow works against the local mock request |
+| the backend replayed the learned request to the mock API | the mock HTTP adapter path works; it does not establish the live endpoint |
+| chat closure travelled over the mock socket | `closure{closed:true}` handling works in the fixture |
 
-The socket stand-in is **strict** in this mode (`accept_socket_sends=False`): a
-chat frame sent over the socket is ignored, exactly as the capture shows the real
-endpoint doing — so the run can only pass through the out-of-band request.
+The socket stand-in is **strict** in this mode (`accept_socket_sends=False`): it
+ignores socket chat frames by test design, so this test exercises the mock HTTP
+adapter path. That is not evidence that the real endpoint rejects socket chat
+sends. The live WS excerpt shows no client chat-send frame, but does not show
+what the real server would do if one were sent.
 
 With `--bot-page-blind` the same run becomes a strict **WebSocket-detection
-proof**: the bot's own page is served a *blind* DOM (the user's messages are
-never handed to that context) and opens no socket, so incoming text can only be
-detected by the backend Socket.IO client. Replies still leave through the
-learned HTTP request; the stand-in then broadcasts the echo over the socket.
-Two extra checks join the table:
+proof** within the mock harness: the bot's own page is served a *blind* DOM
+(the user's messages are never handed to that context) and opens no socket, so
+incoming text can only be detected by the backend Socket.IO client. Replies
+still use the learned request to the mock API; the stand-in broadcasts its echo
+over the mock socket. This validates the architecture against the fixture, not
+the live site's send endpoint. Two extra checks join the table:
 
 | Check | What it proves |
 |-------|----------------|

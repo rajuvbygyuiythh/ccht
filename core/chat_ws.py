@@ -1,15 +1,17 @@
-"""Chat transport over the site's Socket.IO receive channel and HTTP send path.
+"""Chat receive transport plus configurable send adapters.
 
-Built on :mod:`core.socketio` and the capture documented in
-``docs/WS_CHAT_PROTOCOL.md``.  Incoming match/message/typing events and our
-message echoes arrive over Engine.IO v4 + Socket.IO; the full capture contains
-no client chat-send frame.  The captured site writes messages through its own
-HTTP request.  :class:`ChatWebSocket` can replay that learned request, then
-wait for the socket echo (matched by our client nonce) as delivery evidence.
+Built on :mod:`core.socketio` and the anonymized fixture documented in
+``docs/WS_CHAT_PROTOCOL.md``. The supplied WebSocket entry contains incoming
+match/message/typing events and message echoes, but no client chat-send frame.
+It does not include the other network requests, so it does not establish the
+live write transport, endpoint or socket authentication mechanism.
 
-Socket emits remain as an experimental fallback for other builds, but are not
-the observed send path for this capture.  In the live runner, the browser's own
-send request is learned by :class:`SendRequestSniffer` when needed.
+The client can replay an HTTP request template learned by
+:class:`SendRequestSniffer`, then wait for a nonce-matched socket echo. That is
+an implementation capability exercised by the mock; verify the actual live
+Fetch/XHR request before treating it as the site's send path. Socket emits
+remain available for experiments, but the supplied entry does not show one or
+prove whether the server accepts it.
 """
 
 from __future__ import annotations
@@ -29,7 +31,8 @@ from core.socketio import SocketIOClient
 
 DEFAULT_WS_URL = "wss://api.chitchat.gg/socket.io/?EIO=4&transport=websocket"
 
-#: Event names a Socket.IO chat backend may use for "send this message".
+#: Unverified Socket.IO send-event candidates for explicit experiments only.
+#: The supplied capture contains no client chat-send frame.
 SEND_EVENT_CANDIDATES: Tuple[str, ...] = (
     "chatMessage", "sendMessage", "message", "sendChatMessage",
     "message:send", "chat:message", "send",
@@ -100,7 +103,7 @@ def discover_send_event(js_text: str, limit: int = 5) -> List[str]:
 # --------------------------------------------------------------------------- #
 
 class ChatWebSocket:
-    """Session-authenticated socket chat: incoming SMS in, replies out."""
+    """Session-backed socket receiver with optional message-send adapters."""
 
     def __init__(self, *,
                  cookie_header: str = "",
@@ -124,7 +127,7 @@ class ChatWebSocket:
         self.my_id = str(my_id or "")
         self.send_event = str(send_event or "")
         self.sent_event: str = ""          # the one that actually worked
-        # The site's own HTTP send request, once learned (see build_send_template).
+        # Optional HTTP request template learned by observing a page send.
         self.http_send: Dict[str, Any] = {}
         self.log = log
         self.on_message = on_message
@@ -216,9 +219,9 @@ class ChatWebSocket:
     #  socket events
     # ------------------------------------------------------------------ #
     def _on_open(self, _client) -> None:
-        self.log(f"[WS] authenticated with the saved session "
+        self.log(f"[WS] socket opened "
                  f"({len(self.cookie_header.split(';')) if self.cookie_header else 0} "
-                 f"cookies sent)")
+                 f"configured cookies sent)")
         self.client.emit("presenceSync")
         self.log("[WS] presenceSync sent — waiting for the match")
 
@@ -422,9 +425,10 @@ class ChatWebSocket:
                      timeout: Optional[float] = None) -> Tuple[bool, str]:
         """Send one message. Returns ``(confirmed, how)``.
 
-        When an HTTP template is learned, the request is replayed and the
-        server's nonce-matched ``chatMessage`` echo confirms delivery. Socket
-        event probing is only the experimental fallback for other builds.
+        When an HTTP template is configured, the request is replayed and a
+        nonce-matched ``chatMessage`` echo can confirm delivery. Without a
+        template, no Socket.IO chat-send event is guessed by default; an event
+        must be explicitly configured or experimental probing enabled.
         """
         text = str(text or "").strip()
         if not text:
@@ -436,8 +440,10 @@ class ChatWebSocket:
             return self._send_via_http(text, timeout=timeout, wait_for_echo=wait_for_echo)
 
         configured = bool(self.sent_event or self.send_event)
+        if not configured and not self.allow_probe:
+            return False, ("no HTTP send template; Socket.IO chat-send is unverified "
+                           "and disabled unless explicitly configured or probed")
         events = [self.sent_event or self.send_event] if configured else []
-        events.append("chatMessage")
         if self.allow_probe:
             events.extend([e for e in SEND_EVENT_CANDIDATES if e not in events])
         seen = set()
@@ -474,10 +480,10 @@ class ChatWebSocket:
         return False, "no echo for any candidate event"
 
     def set_http_send(self, template: Optional[Dict[str, Any]]) -> None:
-        """Use (or forget) the site's own HTTP send request for replies."""
+        """Configure (or forget) an HTTP request template for replies."""
         self.http_send = dict(template or {})
         if self.http_send:
-            self.log(f"[WS] replies will use the site's own send request: "
+            self.log(f"[WS] replies will use the configured HTTP template: "
                      f"{self.http_send.get('method')} {self.http_send.get('url')}")
 
     def _send_via_http(self, text: str, *, timeout: float,
@@ -503,8 +509,8 @@ class ChatWebSocket:
         if self._echo_event.wait(timeout):
             self.log(f"[WS] ✓ delivery confirmed by the server echo (http/{status})")
             return True, f"http/{status}"
-        # The site's own endpoint took it; the echo may simply have been missed.
-        self.log(f"[WS] the site accepted the message (HTTP {status}) but no socket "
+        # The configured endpoint returned success; the echo may simply have been missed.
+        self.log(f"[WS] the HTTP request returned success ({status}) but no socket "
                  f"echo was seen within {timeout:.1f}s")
         return True, f"http/{status} (echo not seen)"
 
@@ -530,7 +536,7 @@ class ChatWebSocket:
 
 
 # --------------------------------------------------------------------------- #
-#  the site's own send path (HTTP) — see the note in the module docstring
+#  HTTP request template adapter — see the note in the module docstring
 # --------------------------------------------------------------------------- #
 
 #: Body keys that carry the message text, most likely first.
@@ -587,11 +593,12 @@ def save_ws_config(**updates: Any) -> Dict[str, Any]:
 def build_send_template(method: str, url: str, body: Dict[str, Any],
                         headers: Optional[Dict[str, str]] = None,
                         text: str = "") -> Dict[str, Any]:
-    """Normalise one real send request into a replayable template.
+    """Normalize one observed page request into a replayable template.
 
     The field names are detected from the body itself (the value that is the
-    message text, an id-looking value, a nonce-looking value), so the bot never
-    has to guess the site's schema.
+    message text, an id-looking value, a nonce-looking value), so the adapter
+    does not need to guess the schema. A learned template still needs to be
+    verified before use against a live service.
     """
     body = dict(body or {})
     content_field = ""
@@ -741,12 +748,13 @@ def send_template_request(template: Dict[str, Any], *, cookie_header: str = "",
 
 
 class SendRequestSniffer:
-    """Watch a browser context for the app's *own* message-send request.
+    """Watch a browser context for a page's message-send request.
 
-    Nothing is ever typed by the sniffer itself: it just listens.  When the bot's
-    page sends a message (the DOM fallback does exactly that), the request goes
-    through here and is turned into a :func:`build_send_template` template, so
-    the next reply can be sent from the backend — the same way the site does it.
+    Nothing is ever typed by the sniffer itself: it just listens. When the bot's
+    page sends a message (the DOM fallback does exactly that), an observed
+    request can be turned into a :func:`build_send_template` template for the
+    backend adapter. This is a capture/replay capability, not proof of the live
+    endpoint's behavior.
     """
 
     def __init__(self, log: Callable[[str], None] = print, conversation_id: str = "",
@@ -796,7 +804,7 @@ class SendRequestSniffer:
             self.template = template
             nonce_field = template["nonce_field"] or "-"
             conversation_field = template["conversation_field"] or "-"
-            self.log(f"[WS] learned the site's own send request: {template['method']} "
+            self.log(f"[WS] learned a page send request template: {template['method']} "
                      f"{template['url']} (content={template['content_field']!r}, "
                      f"nonce={nonce_field!r}, conversation={conversation_field!r})")
             if self.on_template is not None:
@@ -813,7 +821,7 @@ class SendRequestSniffer:
         try:
             context.on("request", self.on_request)
             self._context = context
-            self.log("[WS] watching the page for the site's own message-send request")
+            self.log("[WS] watching the page for a message-send request")
         except Exception as error:
             self.log(f"[WS] could not watch the page requests: {error}")
 

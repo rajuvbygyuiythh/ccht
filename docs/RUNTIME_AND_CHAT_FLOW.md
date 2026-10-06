@@ -197,9 +197,11 @@ python tools/session_chat.py --all --plan-only
 * **কোনো password লাগে না** — শুধু `account_sessions/<account>/storage_state.json`
   (cookies + localStorage) আর/বা `browser_profiles/<account>/`।
 * **Headless**: `--headless` (ডিফল্ট)। সার্ভারে X না থাকলে Chromium headless-ই চলে।
-* **Token vs cookie**: chitchat.gg cookie-based auth (`__Secure-authjs.session-token`)।
-  `storage_state.json`-এ ওগুলোই থাকে; session-এর ভিতরের `expires` timestamp দেখে
-  `expiring`/`expired` ঠিক হয় — তাই "token dead" আগেই ধরা পড়ে।
+* **Token vs cookie**: the browser app session may use cookies such as
+  `__Secure-authjs.session-token`; `storage_state.json` can retain them and its
+  `expires` timestamps are used for session health. This general app-session
+  behavior does not establish WebSocket authentication—the supplied WS entry
+  has no Cookie header (see Part 3).
 * **Keep-alive**: দীর্ঘ run-এ প্রতি `session_refresh_minutes` (ডিফল্ট 10) মিনিটে cookie
   আবার লেখা হয়, তাই পরের বার আবার login লাগে না।
 * **এক account এক browser**: একই account দুই জায়গায় (দুই process/দুই PC) একসাথে
@@ -231,18 +233,20 @@ python tools/session_chat.py --all --plan-only
 
 ---
 
-## Part 3 — Socket receive + HTTP send (v2.8)
+## Part 3 — Socket receive + configurable send path (v2.8)
 
 `--transport ws`-এ backend Socket.IO client দিয়ে match state, incoming SMS,
-typing ও server echoes পড়ে। **Captured build-এ outgoing chat text WebSocket-এ
-পাঠানো হয় না**: browser-এর app নিজস্ব HTTP request দিয়ে message লেখে। প্রথমে
-সেই request page-এ observe/sniff করে template শেখা হয়; পরে একই method/URL/body
-shape backend session cookies-সহ replay হয়। Capture-এর প্রমাণ ও plain-dump
-format: `docs/WS_CHAT_PROTOCOL.md`।
+typing ও server echoes পড়ে। সরবরাহ করা WebSocket entry-তে client chat-send
+frame নেই, তাই ওই socket-এ chat text পাঠানো হয়নি—কিন্তু entry-তে অন্য 166টি
+network request নেই; এটি HTTP send endpoint, write transport, বা socket
+authentication method প্রমাণ করে না। Python implementation page-এর outgoing
+request sniff করে template শেখার এবং পরে সেটি backend থেকে replay করার ক্ষমতা
+রাখে। Mock E2E এই code path পরীক্ষা করে; live send path হিসেবে ধরার আগে full
+capture-এর Fetch/XHR request যাচাই করুন। বিস্তারিত: `docs/WS_CHAT_PROTOCOL.md`।
 
 ```
- [Restore] saved session verified ──────► browser-এ cookies / logged-in state
-        │ ⑩ context.cookies() → Cookie header
+ [Restore] saved browser session ───────► page state / configured cookies
+        │ ⑩ implementation may attach a Cookie header (not auth proof)
         ▼
  [WS] connect wss://api.chitchat.gg/socket.io/?EIO=4&transport=websocket
         │      server 0{…}              client 40{release}
@@ -251,20 +255,23 @@ format: `docs/WS_CHAT_PROTOCOL.md`।
         ▼
  [SMS]  server 42["chatMessage", {message:{author, content}}]
         └────────────────────────────────► ChatRuleBot.reply()
-        │ ⑪ learned app request + session cookies + fresh nonce
+        │ ⑪ verified template (or a newly observed page request) + fresh nonce
         ▼
- [HTTP] backend replays the site's send request (text + conversation id + nonce)
-        │ ⑫ HTTP success is followed by a matching server echo
+ [HTTP] implementation replays the configured request template
+        │ ⑫ mock test checks HTTP response + nonce-matched socket echo
         ▼
- [WS]   server 42["chatMessage", …, nonce] ─► delivery confirmed
+ [WS]   server 42["chatMessage", …, nonce] ─► echo matching
 
- no template yet: page fallback can make the app's first send and teach the
- request sniffer; optional socket emits are experimental and not capture-proven.
+ no template yet: the page can make a send so the sniffer can learn its request.
+ The supplied WS entry has no client chat-send frame; this does not prove that
+ the live server rejects such an event. The client fails closed by default; an
+ explicit socket experiment is unverified. The mock E2E's HTTP flow is not live
+ endpoint evidence.
 ```
 
 | ধাপ | ফাইল / ফাংশন |
 |---|---|
-| ⑩ cookies → header | `core/chat_ws.py` → `cookies_header()`, `load_session_cookies()` |
+| ⑩ configured cookies → header | `core/chat_ws.py` → `cookies_header()`, `load_session_cookies()` (client capability; live socket auth is unverified) |
 | socket + frames | `core/socketio.py` → `SocketIOClient` (stdlib only, ping/pong, reconnect) |
 | incoming parse | `core/chat_ws.py` → `ChatWebSocket._handle_match()`, `_handle_message()` |
 | learn app write | `SendRequestSniffer`, `build_send_template()` → method, URL, body fields |
@@ -274,9 +281,12 @@ format: `docs/WS_CHAT_PROTOCOL.md`।
 | offline replay | `tools/ws_chat.py --replay` (HAR or plain `ws.txt` dump) |
 
 `data/ws_config.json` stores the learned request template locally; it may contain
-account-specific headers, so it is git-ignored. The full HTTP send endpoint cannot
-be recovered from a WS-only text dump; include the HTTP/fetch request in a full
-HAR, or let `SendRequestSniffer` learn it from the live page.
+account-specific headers, so it is git-ignored. The supplied WS-only entry does
+not show the write endpoint or establish cookie auth. To verify the live send
+path, include the outgoing Fetch/XHR request from the full HAR or let
+`SendRequestSniffer` observe a page send. Redact cookie, authorization, CSRF and
+other credential values; method, URL path, body field names and header names are
+enough to inspect the request shape.
 
 চালানো:
 
@@ -287,6 +297,6 @@ python tools\ws_chat.py --account EMAIL --reply
 python tools\ws_chat.py --show-config
 ```
 
-পরীক্ষা: এই checkout-এ `python test_ws_transport.py` **107/107** পাস। Browser E2E
+পরীক্ষা: এই checkout-এ `python test_ws_transport.py` **108/108** পাস। Browser E2E
 এখানে চালানো যায়নি—Playwright/Chromium install করা নেই; README-তে এই সীমাবদ্ধতা
 লেখা আছে।
