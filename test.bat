@@ -12,21 +12,28 @@ if exist ".venv\Scripts\python.exe" (
 set PYTHONIOENCODING=utf-8
 
 echo ---- EVA automated checks (pools + funnel + fuzz) -------------------
-echo [1/3] pool check: input triggers - output replies (renamed pools)
+echo [0/4] markup-change check: selector doctor + self-healing (SMS detection)
+"%PYTHONBIN%" test_selector_doctor.py
+if errorlevel 1 (
+  echo [ERROR] selector doctor test failed.
+  pause
+  exit /b 1
+)
+echo [1/4] pool check: input triggers - output replies (renamed pools)
 "%PYTHONBIN%" test_matcher.py
 if errorlevel 1 (
   echo [ERROR] matcher test failed.
   pause
   exit /b 1
 )
-echo [2/3] funnel check: first-SMS routing - country-once - asksc - share - END
+echo [2/4] funnel check: first-SMS routing - country-once - asksc - share - END
 "%PYTHONBIN%" test_live.py
 if errorlevel 1 (
   echo [ERROR] live chat test failed.
   pause
   exit /b 1
 )
-echo [3/3] fuzz check: random inputs - states stay valid, no repeats
+echo [3/4] fuzz check: random inputs - states stay valid, no repeats
 "%PYTHONBIN%" test_fuzz.py
 if errorlevel 1 (
   echo [ERROR] fuzz test failed.

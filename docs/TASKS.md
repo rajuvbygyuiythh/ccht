@@ -67,6 +67,17 @@ None currently assigned.
 - [x] `tools/chat_detect_debug.py` page inspector
 - [x] `test_chat_detect.py` 47/47 + all existing suites still green
 
+### Phase 12 — Site markup changes handled automatically ✅
+- [x] `browser/selector_doctor.py` — derives container/row/text/username/
+      speaker-hint selectors from the markup itself (saved HTML or live page)
+- [x] `config/chat_selectors.json` — custom selectors, tried before the
+      built-in list (no code edit; `EVA_CHAT_SELECTORS` overrides the path)
+- [x] Runtime self-healing in `browser/chat_reader.py` (discovery + retry +
+      learned selectors, 30 s cooldown, `diag.healed`)
+- [x] `tools/chat_detect_debug.py --suggest/--save/--explain/--offline`
+- [x] 3 new markup fixtures + a non-chat fixture (no phantom SMS)
+- [x] `test_selector_doctor.py` 105/105 (96 without jsdom); all old suites green
+
 ### Phase 9 — Hardcoded Pools to TXT ✅
 - [x] Created 10 new txt files
 - [x] All pools now from txt files

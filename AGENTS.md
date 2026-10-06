@@ -144,6 +144,39 @@ unless explicitly asked by the user:
 ### Phase 8 — Country Collection Fix ✅
 - [x] `chat/rules.py`: Country collection now goes directly to flirty_questions.txt (was replying from country.txt)
 
+### Phase 12 — Site markup changes handled automatically (selector doctor) ✅
+- [x] NEW `browser/selector_doctor.py` — derives the chat selectors from the
+      page itself (container / row / text / username / my-username /
+      own-other alignment hints). Standard library only on saved HTML
+      (`html.parser`), same code on a live page (DOM serialised from
+      Playwright); hashed build classes (`css-1a2b3c`, `sc-bdVaJa`) are
+      filtered, stable `data-*` attributes preferred, and every suggestion is
+      verified by reading the SMS back before it is offered
+- [x] NEW `config/chat_selectors.json` support in `browser/chat_reader.py`
+      (`load_selector_config`, `apply_selectors`, `reset_learned`): custom
+      selectors are tried BEFORE the built-in list, so a redesign is fixed
+      without editing code (`EVA_CHAT_SELECTORS` overrides the path)
+- [x] `browser/chat_reader.py` self-heals at runtime: when every built-in
+      selector misses but the page shows chat text, the doctor runs (once per
+      30 s), the read is retried with the derived selectors and they are
+      remembered for later polls — `diag.healed` / `diag.healedSelectors` /
+      `diag.suggestionFile`; `EVA_SELECTOR_AUTOSAVE=1` persists the result
+- [x] `browser/browser_automation.py`: a successful heal is logged once
+      ("chat markup CHANGED — the bot healed itself"), and the "0 messages
+      parsed" warning now points at the suggestion file + the doctor tool
+- [x] `tools/chat_detect_debug.py`: new `--suggest`, `--save`, `--explain`,
+      `--offline`, `--no-autodiscover` (exit 0 = readable/suggestion found,
+      2 = nothing found)
+- [x] NEW `test_selector_doctor.py` (105 checks with jsdom, 96 without) +
+      3 new markup fixtures (`chat_v6_hashed_react`, `chat_v7_virtual_list`,
+      `chat_v8_nested_wrapper`) + a negative fixture (`not_a_chat`) the doctor
+      must reject — no phantom SMS on marketing pages
+- [x] Speaker hints now also read alignment *styles* (inline + computed), not
+      only alignment classes (`justify-end` / `flex-end` / `margin-left:auto`)
+- [x] Regression suites unchanged: test_flow 124/124, test_live 44/44,
+      test_fuzz 4/4, test_chat_detect 47/47 (34/34 without jsdom),
+      test_matcher round-trip OK, demo_chat/demo_flow PASS
+
 ### Phase 9 — Hardcoded Pools to TXT Files ✅
 - [x] Created 10 new txt files for previously hardcoded pools
 - [x] All pools now load from editable txt files
@@ -235,9 +268,14 @@ chat/database/loader.py — DB loader
 entry/main.py          — GUI dashboard
 entry/thread_manager.py — Thread orchestration
 browser/browser_automation.py — Browser worker
-browser/chat_reader.py — Stranger-SMS detection (multi-selector + tracker)
+browser/chat_reader.py — Stranger-SMS detection (multi-selector + tracker
+                         + config selectors + runtime self-healing)
+browser/selector_doctor.py — derives selectors when the site markup changes
+config/chat_selectors.json — custom selectors (written by the doctor; optional)
 test_chat_detect.py    — Detection test-suite (47 checks)
+test_selector_doctor.py — Markup-change test-suite (105 checks w/ jsdom)
 tools/chat_detect_debug.py — "what can the bot read?" page inspector
+                         (+ --suggest / --save / --explain / --offline)
 ```
 
 ## 14. CRITICAL RULES FOR FUTURE AGENTS

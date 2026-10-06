@@ -153,6 +153,53 @@ python tools/chat_detect_debug.py --url https://chitchat.gg/        # live
 Tests: `python test_chat_detect.py` (47 checks; the DOM tests need
 `node` + `npm install jsdom`, otherwise they are skipped with a note).
 
+## Site markup changes — the selector doctor (v2.3)
+
+A selector list is still a list: the next redesign (new classes, `ol/li`
+replaced by `div` rows, hashed React/Tailwind names, a virtualised list,
+renamed `data-*` attributes) would blind the bot again. So the bot no longer
+depends on a list alone.
+
+**1. It heals itself at runtime.** When the built-in selectors match nothing
+but the page clearly has chat text, `browser/chat_reader.py` runs
+`browser/selector_doctor.py`, which *derives* the selectors from the page
+markup (repeated-sibling rows, stable class/attribute names, the message
+text node, the username node, alignment hints), retries the read with them,
+and remembers them for the following polls. The log says what happened:
+
+```
+[Detect] chat markup CHANGED — the bot healed itself and learned the new selectors:
+[Detect] container=div.chat-scroll | items_selector=div.chat-row | items=4 | ... | HEALED={...}
+[Detect] keep them with:  python tools/chat_detect_debug.py --html <saved chat page.html> --save
+```
+
+**2. You can drive it by hand** — save the chat page in the browser
+(right-click → *Save as* → "Webpage, HTML only") and run:
+
+```bash
+python tools/chat_detect_debug.py --html chat_page.html --suggest   # derive + verify
+python tools/chat_detect_debug.py --html chat_page.html --explain   # why these selectors
+python tools/chat_detect_debug.py --html chat_page.html --save      # apply (no code edit)
+python tools/chat_detect_debug.py --html chat_page.html --offline --suggest   # no Playwright/jsdom
+python tools/chat_detect_debug.py --url https://chitchat.gg/ --suggest        # live page
+```
+
+`--save` merges the result into `config/chat_selectors.json`; that file is
+loaded on every poll and its selectors are tried **before** the built-in
+list, so a site change is fixed without touching code (delete the file to go
+back). Every heal also drops the evidence in
+`logs/selector_suggestion_*.json`, and `EVA_SELECTOR_AUTOSAVE=1` makes the
+runtime write `config/chat_selectors.json` itself.
+
+**3. It refuses to guess on non-chat pages.** Landing pages, sidebars and
+article lists are rejected by the scoring (link rows, headings, CTA buttons,
+marketing words, site chrome) — no phantom SMS for the bot to answer.
+
+Example config: `config/chat_selectors.example.json`.
+Tests: `python test_selector_doctor.py` (105 checks; the jsdom pass runs the
+real extractor against the new-markup fixtures and is skipped when
+`node`/`jsdom` are missing).
+
 ## Changes vs the original 22.zip snapshot
 
 1. `data/input` + `data/output` renamed to direct symmetric names

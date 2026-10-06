@@ -463,6 +463,7 @@ class ChitchatAutomation:
         self._last_detect_diag = {}
         self._empty_extract_polls = 0
         self._detect_warned = False
+        self._heal_logged = False
 
     def _launch_camoufox(self):
         """Launch the configured browser engine (Chromium or Camoufox).
@@ -2796,6 +2797,11 @@ class ChitchatAutomation:
                 sample = (self._last_detect_diag or {}).get("sampleClasses") or []
                 if sample:
                     self.log(f"[Detect] sample rows: {sample[:3]}")
+                suggestion = (self._last_detect_diag or {}).get("suggestionFile")
+                if suggestion:
+                    self.log(f"[Detect] selector suggestion written: {suggestion}")
+                self.log("[Detect] fix it with:  python tools/chat_detect_debug.py "
+                         "--html <saved chat page.html> --suggest   (--save applies it)")
             if str(os.environ.get("EVA_DUMP_CHAT_DOM", "")).strip() not in ("", "0", "false", "False"):
                 if CHAT_READER_AVAILABLE:
                     path = chat_reader.dump_dom(page)
@@ -2824,6 +2830,16 @@ class ChitchatAutomation:
                     self._my_username = str(found_username)
                 if messages:
                     self._empty_extract_polls = 0
+                    if (diag or {}).get("healed") and not self._heal_logged:
+                        self._heal_logged = True
+                        learned = (diag or {}).get("healedSelectors") or {}
+                        self.log("[Detect] chat markup CHANGED — the bot healed itself "
+                                 "and learned the new selectors:")
+                        self.log(f"[Detect] {chat_reader.describe_diag(diag)}")
+                        self.log("[Detect] keep them with:  python tools/chat_detect_debug.py "
+                                 "--html <saved chat page.html> --save")
+                        if not learned:
+                            self.log("[Detect] (no selector detail in diag)")
                     return messages
                 self._empty_extract_polls += 1
                 # nothing parsed: give the legacy selector set a chance too

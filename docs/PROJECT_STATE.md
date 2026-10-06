@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — EVA Bot Current State
 
-Last updated: Phase 9 — Hardcoded Pools to TXT Files
+Last updated: Phase 12 — Site markup changes handled automatically (selector doctor)
 
 ---
 
@@ -8,6 +8,7 @@ Last updated: Phase 9 — Hardcoded Pools to TXT Files
 
 ### Test Results
 - `test_chat_detect.py`: 47/47 passed (SMS detection)
+- `test_selector_doctor.py`: 105/105 passed (markup change handling; 96/96 without jsdom)
 - `test_flow.py`: 124/124 passed
 - `test_live.py`: 44/44 passed
 - `test_fuzz.py`: 4/4 passed
@@ -23,6 +24,10 @@ Last updated: Phase 9 — Hardcoded Pools to TXT Files
 6. **Flow Mixing** — 70% main pool / 30% flow-specific variety
 7. **Country Collection** — Directly to flirty_questions.txt after country capture
 8. **All Pools Editable** — 10 previously hardcoded pools now in txt files
+9. **Auto-Healing Selectors** — `browser/selector_doctor.py` derives the
+   selectors from the page when the site is redesigned; `config/chat_selectors.json`
+   applies them without code changes; the bot also learns them at runtime
+   (`diag.healed`) and never guesses on non-chat pages
 
 ### File Structure
 - `data/output/` — 22 txt files (ALL EDITABLE BY USER)
@@ -78,6 +83,9 @@ See `AGENTS.md` Phase 1-8 for full details of all completed tasks.
 - **Stranger-SMS detection (Phase 11)** — see `browser/chat_reader.py`:
   multi-selector reading, fingerprint-based new-message tracking,
   "0 messages parsed" warning, `tools/chat_detect_debug.py` inspector
+- **Markup-change handling (Phase 12)** — `browser/selector_doctor.py` +
+  `config/chat_selectors.json` + runtime self-healing; fix a changed site
+  with `python tools/chat_detect_debug.py --html page.html --save`
 
 ---
 

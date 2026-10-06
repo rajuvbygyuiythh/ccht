@@ -30,6 +30,7 @@ Playwright/Camoufox ``page`` is passed in.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
@@ -139,19 +140,29 @@ CHAT_EXTRACT_JS = r"""
   const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
   const key = (s) => norm(s).toLowerCase().replace(/[?.!,]+$/, '');
 
-  const CONTAINERS = %(containers)s;
-  const ITEMS = %(items)s;
-  const USERNAMES = %(usernames)s;
-  const TEXTS = %(texts)s;
-  const MY_NAMES = %(my_names)s;
-  const OWN_HINTS = %(own_hints)s;
-  const OTHER_HINTS = %(other_hints)s;
+  // Custom selector groups (config file / selector doctor / self-healing)
+  // are prepended, so a site change can be handled without touching code.
+  const extra = (args && args.sel) || {};
+  const cat = (over, base) => (Array.isArray(over) ? over.concat(base) : base);
+  const CONTAINERS = cat(extra.containers, %(containers)s);
+  const ITEMS = cat(extra.items, %(items)s);
+  const USERNAMES = cat(extra.usernames, %(usernames)s);
+  const TEXTS = cat(extra.texts, %(texts)s);
+  const MY_NAMES = cat(extra.myUsernames, %(my_names)s);
+  const OWN_HINTS = cat(extra.ownHints, %(own_hints)s);
+  const OTHER_HINTS = cat(extra.otherHints, %(other_hints)s);
+  const custom = new Set([].concat(
+    Array.isArray(extra.containers) ? extra.containers : [],
+    Array.isArray(extra.items) ? extra.items : [],
+    Array.isArray(extra.usernames) ? extra.usernames : [],
+    Array.isArray(extra.texts) ? extra.texts : []));
 
   const diag = {
     container: null, containerTag: '', itemSelector: null, items: 0,
     myUsername: null, myUsernameSelector: null,
     speakerSources: {}, sampleClasses: [], rawTextLength: 0,
-    rawLines: 0, errors: []
+    rawLines: 0, errors: [], customSelectors: custom.size,
+    usedCustom: false
   };
 
   const pickAll = (root, sels) => {
@@ -191,7 +202,11 @@ CHAT_EXTRACT_JS = r"""
   for (const sel of CONTAINERS) {
     try {
       const el = document.querySelector(sel);
-      if (el) { container = el; diag.container = sel; break; }
+      if (el) {
+        container = el; diag.container = sel;
+        if (custom.has(sel)) diag.usedCustom = true;
+        break;
+      }
     } catch (e) { diag.errors.push(String(e).slice(0, 80)); }
   }
   // No known container at all: fall back to <body> but ONLY for the generic
@@ -211,11 +226,34 @@ CHAT_EXTRACT_JS = r"""
   const itemEls = outermost(items.els);
   diag.itemSelector = items.sel;
   diag.items = itemEls.length;
+  if (items.sel && custom.has(items.sel)) diag.usedCustom = true;
 
+  // A row's "signature" for speaker hints: class names (row + parent) plus
+  // the alignment style (inline style AND computed values, so both
+  // class-based ("justify-end") and style-based ("flex-end",
+  // "margin-left:auto") hints work — the selector doctor emits both kinds.
+  const styleSig = (el) => {
+    let sig = '';
+    const add = (value) => { if (value) sig += ' ' + String(value); };
+    try { add(el.getAttribute('style')); } catch (e) {}
+    try { if (el.parentElement) add(el.parentElement.getAttribute('style')); } catch (e) {}
+    try {
+      const cs = (typeof window !== 'undefined' && window.getComputedStyle)
+        ? window.getComputedStyle(el) : null;
+      if (cs) {
+        add(cs.justifyContent); add(cs.alignItems); add(cs.alignSelf);
+        add(cs.textAlign); add(cs.marginLeft); add(cs.marginRight);
+      }
+      const ps = (el.parentElement && typeof window !== 'undefined' && window.getComputedStyle)
+        ? window.getComputedStyle(el.parentElement) : null;
+      if (ps) { add(ps.justifyContent); add(ps.alignItems); }
+    } catch (e) {}
+    return sig.replace(/\s*:\s*/g, ':').toLowerCase();
+  };
   const classify = (el) => {
     let cls = '';
     try { cls = (el.className || '') + ' ' + ((el.parentElement && el.parentElement.className) || ''); } catch (e) {}
-    cls = String(cls).toLowerCase();
+    cls = (String(cls) + ' ' + styleSig(el)).toLowerCase();
     if (OWN_HINTS.some((h) => cls.includes(h))) return 'You';
     if (OTHER_HINTS.some((h) => cls.includes(h))) return 'Stranger';
     return null;
@@ -226,7 +264,7 @@ CHAT_EXTRACT_JS = r"""
   for (const item of itemEls) {
     let textEl = null;
     for (const sel of TEXTS) {
-      try { const el = item.querySelector(sel); if (el) { textEl = el; break; } } catch (e) {}
+      try { const el = item.querySelector(sel); if (el) { textEl = el; if (custom.has(sel)) diag.usedCustom = true; break; } } catch (e) {}
     }
 
     let username = '';
@@ -235,7 +273,7 @@ CHAT_EXTRACT_JS = r"""
         const el = item.querySelector(sel);
         if (el) {
           const t = norm(el.getAttribute('username') || el.textContent || '');
-          if (t && t.length <= 40) { username = t; break; }
+          if (t && t.length <= 40) { username = t; if (custom.has(sel)) diag.usedCustom = true; break; }
         }
       } catch (e) {}
     }
@@ -391,31 +429,286 @@ LEGACY_EXTRACT_JS = r"""
 
 
 # --------------------------------------------------------------------------
+# Selector config + learned selectors
+#
+# The site can be redesigned at any time.  Instead of editing this file, a
+# discovered selector set can live in ``config/chat_selectors.json`` (written
+# by ``tools/chat_detect_debug.py --save``), and the reader can even heal
+# itself at runtime (see :func:`extract_with_diag`).  Custom selectors are
+# always tried BEFORE the built-in ones, so nothing regresses.
+# --------------------------------------------------------------------------
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+SELECTOR_CONFIG_ENV = "EVA_CHAT_SELECTORS"
+DEFAULT_SELECTOR_CONFIG = ROOT_DIR / "config" / "chat_selectors.json"
+AUTOSAVE_ENV = "EVA_SELECTOR_AUTOSAVE"
+DISCOVERY_COOLDOWN = 30.0
+
+#: config-file keys -> the key names used in the extractor JS arguments
+_SELECTOR_KEY_MAP = {
+    "containers": "containers",
+    "items": "items",
+    "usernames": "usernames",
+    "texts": "texts",
+    "my_usernames": "myUsernames",
+    "myusernames": "myUsernames",
+    "own_hints": "ownHints",
+    "ownhints": "ownHints",
+    "other_hints": "otherHints",
+    "otherhints": "otherHints",
+}
+
+_CONFIG_CACHE: Dict[str, Any] = {"path": None, "mtime": None, "data": {}}
+_LEARNED: Dict[str, List[str]] = {}
+_LAST_DISCOVERY_TS = 0.0
+
+
+def selector_config_path() -> Path:
+    """Where the custom selectors are read from (env override supported)."""
+    override = os.environ.get(SELECTOR_CONFIG_ENV)
+    return Path(override).expanduser() if override else DEFAULT_SELECTOR_CONFIG
+
+
+def _clean_selector_list(values: Any) -> List[str]:
+    out: List[str] = []
+    if isinstance(values, str):
+        values = [values]
+    for value in values or []:
+        sel = str(value or "").strip()
+        if not sel or len(sel) > 400:
+            continue
+        # cheap sanity check: selectors are passed to querySelector, which
+        # throws on garbage — we prefer to skip it here (diag stays quiet)
+        if sel.count("[") != sel.count("]") or sel.count("(") != sel.count(")"):
+            continue
+        if sel not in out:
+            out.append(sel)
+    return out
+
+
+def coerce_selectors(raw: Optional[Dict[str, Any]]) -> Dict[str, List[str]]:
+    """Normalise any selector dict (snake_case, camelCase) to JS arg keys."""
+    out: Dict[str, List[str]] = {}
+    if not isinstance(raw, dict):
+        return out
+    for key, value in raw.items():
+        target = _SELECTOR_KEY_MAP.get(str(key).lower().replace("-", "_"))
+        if not target:
+            continue
+        cleaned = _clean_selector_list(value)
+        if cleaned:
+            out[target] = cleaned
+    return out
+
+
+def load_selector_config(*, force: bool = False) -> Dict[str, List[str]]:
+    """Load ``config/chat_selectors.json`` (cached by mtime).
+
+    A broken file never breaks the bot: it is ignored (and reported in the
+    diagnostics of the next extraction).
+    """
+    path = selector_config_path()
+    try:
+        stat = path.stat()
+    except OSError:
+        _CONFIG_CACHE.update(path=None, mtime=None, data={})
+        return {}
+    if (not force and _CONFIG_CACHE["path"] == str(path)
+            and _CONFIG_CACHE["mtime"] == stat.st_mtime):
+        return dict(_CONFIG_CACHE["data"])
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8")) or {}
+        data = coerce_selectors(raw)
+    except Exception:
+        data = {}
+    _CONFIG_CACHE.update(path=str(path), mtime=stat.st_mtime, data=data)
+    return dict(data)
+
+
+def learned_selectors() -> Dict[str, List[str]]:
+    """Selectors discovered at runtime for this process (self-healing)."""
+    return {k: list(v) for k, v in _LEARNED.items()}
+
+
+def apply_selectors(selectors: Optional[Dict[str, Any]], *, persist: bool = False,
+                    note: str = "") -> Dict[str, List[str]]:
+    """Remember a selector set for every later poll (used by healing/tools)."""
+    clean = coerce_selectors(selectors)
+    for key, values in clean.items():
+        merged = list(_LEARNED.get(key) or [])
+        for value in values:
+            if value not in merged:
+                merged.append(value)
+        _LEARNED[key] = merged
+    if persist and clean:
+        try:
+            from browser import selector_doctor
+            report = selector_doctor.Report(ok=True, selectors=selectors, confidence=1.0,
+                                            source="apply_selectors")
+            selector_doctor.save_config(report, selector_config_path(), note=note)
+        except Exception:
+            pass
+    return clean
+
+
+def reset_learned() -> None:
+    """Forget runtime-learned selectors (tests / manual retry)."""
+    _LEARNED.clear()
+
+
+def merge_selector_dicts(*dicts: Optional[Dict[str, Any]]) -> Dict[str, List[str]]:
+    """Merge selector dicts (earlier wins, deduped, JS arg keys)."""
+    out: Dict[str, List[str]] = {}
+    for raw in dicts:
+        for key, values in coerce_selectors(raw).items():
+            merged = out.setdefault(key, [])
+            for value in values:
+                if value not in merged:
+                    merged.append(value)
+    return out
+
+
+def custom_selectors(extra: Optional[Dict[str, Any]] = None) -> Dict[str, List[str]]:
+    """All non-default selectors: config file + runtime-learned + explicit."""
+    return merge_selector_dicts(load_selector_config(), _LEARNED, extra)
+
+
+def suggestion_dir() -> Path:
+    return ROOT_DIR / "logs"
+
+
+def save_suggestion(report: Any, *, autosave: Optional[bool] = None) -> Optional[str]:
+    """Persist a discovery result.
+
+    Always writes ``logs/selector_suggestion_*.json`` (so the evidence stays
+    for a human), and additionally updates the real config file when
+    ``EVA_SELECTOR_AUTOSAVE=1``.
+    """
+    try:
+        from browser import selector_doctor
+        out_dir = suggestion_dir()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        path = out_dir / f"selector_suggestion_{stamp}.json"
+        path.write_text(json.dumps(report.to_config("auto-discovered by chat_reader"),
+                                   indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8")
+        if autosave is None:
+            autosave = str(os.environ.get(AUTOSAVE_ENV, "")).strip() not in ("", "0", "false", "False")
+        if autosave:
+            selector_doctor.save_config(report, selector_config_path(),
+                                        note="auto-healed by chat_reader at runtime")
+        return str(path)
+    except Exception:
+        return None
+
+
+# --------------------------------------------------------------------------
 # Page-facing API
 # --------------------------------------------------------------------------
 
+def _evaluate(page, args: Dict[str, Any]) -> Tuple[Any, List[str]]:
+    """Run the extractor JS; returns (result, errors)."""
+    errors: List[str] = []
+    try:
+        return page.evaluate(CHAT_EXTRACT_JS, args), errors
+    except Exception as exc:  # page closed / evaluate failed
+        errors.append(f"evaluate: {type(exc).__name__}: {exc}")
+        try:
+            return page.evaluate(CHAT_EXTRACT_JS, args), errors
+        except Exception as exc2:
+            errors.append(f"evaluate retry: {type(exc2).__name__}: {exc2}")
+            return None, errors
+
+
+def _self_heal(page, base_args: Dict[str, Any], diag: Dict[str, Any],
+               recent: List[str]) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """Markup changed? derive the selectors from the page and retry once."""
+    global _LAST_DISCOVERY_TS
+    messages: List[Dict[str, Any]] = []
+    now = time.time()
+    if now - _LAST_DISCOVERY_TS < DISCOVERY_COOLDOWN:
+        diag["discoverySkipped"] = "cooldown"
+        return messages, []
+    _LAST_DISCOVERY_TS = now
+    try:
+        from browser import selector_doctor
+    except Exception as exc:
+        diag["errors"].append(f"selector doctor unavailable: {type(exc).__name__}: {exc}")
+        return messages, []
+    try:
+        report = selector_doctor.discover_page(page)
+    except Exception as exc:
+        diag["errors"].append(f"discovery: {type(exc).__name__}: {exc}")
+        return messages, []
+
+    diag["discoveryRuns"] = int(diag.get("discoveryRuns") or 0) + 1
+    diag["discovery"] = report.summary()
+    if not report.ok:
+        return messages, []
+    discovered = coerce_selectors(report.selectors)
+    if not discovered.get("containers") or not discovered.get("items"):
+        diag["errors"].append("discovery found no usable container/row selector")
+        return messages, []
+
+    args = dict(base_args)
+    args["sel"] = merge_selector_dicts(base_args.get("sel"), discovered)
+    result, errors = _evaluate(page, args)
+    if errors:
+        diag["errors"].extend(errors)
+        return messages, []
+    if isinstance(result, dict):
+        diag.update({k: v for k, v in (result.get("diag") or {}).items()
+                     if k not in ("errors",)})
+        messages = _post_process(result.get("messages") or [], recent)
+    elif isinstance(result, list):
+        messages = _post_process(result, recent)
+
+    path = save_suggestion(report)
+    if path:
+        diag["suggestionFile"] = path
+    if messages:
+        apply_selectors(discovered)
+        diag["healed"] = True
+        diag["healedSelectors"] = discovered
+    return messages, []
+
+
 def extract_with_diag(page, recent_sent: Optional[Iterable[str]] = None,
-                      my_username: Optional[str] = None) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+                      my_username: Optional[str] = None,
+                      extra_selectors: Optional[Dict[str, Any]] = None,
+                      autodiscover: bool = True,
+                      ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """Read the chat list from *page*.
 
     Returns ``(messages, diag)`` where every message is
     ``{'speaker': 'You'|'Stranger', 'message': str, ...}``.
+
+    Selector sources, in priority order: *extra_selectors* (caller) →
+    ``config/chat_selectors.json`` → runtime-learned (self-healing) → the
+    built-in list.
+
+    When nothing is detected and *autodiscover* is on, the page markup is
+    analysed once (``browser/selector_doctor``) and the extraction is retried
+    with the discovered selectors — that is how a redesigned site is handled
+    without editing code.  ``diag`` reports ``healed``/``healedSelectors``/
+    ``suggestionFile`` when that happens.
 
     Never raises for site-side problems: JS errors land in ``diag['errors']``
     so the chat loop keeps running.
     """
     diag: Dict[str, Any] = {"extractor": "chat_reader", "errors": []}
     recent = [norm_text(t) for t in (recent_sent or []) if norm_text(t)]
-    args = {"recentSent": recent, "myUsernameHint": norm_text(my_username) or None}
-    try:
-        result = page.evaluate(CHAT_EXTRACT_JS, args)
-    except Exception as exc:  # page closed / evaluate failed
-        diag["errors"].append(f"evaluate: {type(exc).__name__}: {exc}")
-        try:
-            result = page.evaluate(CHAT_EXTRACT_JS, args)
-        except Exception as exc2:
-            diag["errors"].append(f"evaluate retry: {type(exc2).__name__}: {exc2}")
-            return [], diag
+    args: Dict[str, Any] = {"recentSent": recent,
+                            "myUsernameHint": norm_text(my_username) or None}
+    custom = custom_selectors(extra_selectors)
+    if custom:
+        args["sel"] = custom
+
+    result, errors = _evaluate(page, args)
+    if errors and result is None:
+        diag["errors"].extend(errors)
+        return [], diag
 
     if isinstance(result, list):  # defensive: old-style return
         return _post_process(result, recent), diag
@@ -424,14 +717,27 @@ def extract_with_diag(page, recent_sent: Optional[Iterable[str]] = None,
         return [], diag
 
     diag.update(result.get("diag") or {})
-    messages = result.get("messages") or []
-    return _post_process(messages, recent), diag
+    messages = _post_process(result.get("messages") or [], recent)
+    if messages or not autodiscover:
+        return messages, diag
+    # nothing parsed and the page shows no chat text at all -> there is
+    # nothing to discover (blank page / not the chat view yet)
+    if int(diag.get("rawTextLength") or 0) < 1:
+        diag["discoverySkipped"] = "no text on the page"
+        return messages, diag
+    healed, more_errors = _self_heal(page, args, diag, recent)
+    diag["errors"].extend(more_errors)
+    return healed, diag
 
 
 def extract(page, recent_sent: Optional[Iterable[str]] = None,
-            my_username: Optional[str] = None) -> List[Dict[str, Any]]:
+            my_username: Optional[str] = None,
+            extra_selectors: Optional[Dict[str, Any]] = None,
+            autodiscover: bool = True) -> List[Dict[str, Any]]:
     """Same as :func:`extract_with_diag` but returns only the messages."""
-    return extract_with_diag(page, recent_sent=recent_sent, my_username=my_username)[0]
+    return extract_with_diag(page, recent_sent=recent_sent, my_username=my_username,
+                             extra_selectors=extra_selectors,
+                             autodiscover=autodiscover)[0]
 
 
 def legacy_extract(page) -> List[Dict[str, Any]]:
@@ -493,15 +799,24 @@ def describe_diag(diag: Optional[Dict[str, Any]]) -> str:
         return "no diagnostics"
     sources = diag.get("speakerSources") or {}
     src_txt = ",".join(f"{k}={v}" for k, v in sorted(sources.items())) or "-"
-    return (
+    line = (
         f"container={diag.get('container') or 'NOT FOUND'}"
         f" | items_selector={diag.get('itemSelector') or 'none'}"
         f" | items={diag.get('items', 0)}"
         f" | my_username={diag.get('myUsername') or 'unknown'}"
         f" | speaker_via={src_txt}"
         f" | text_chars={diag.get('rawTextLength', 0)}"
-        + (f" | errors={diag.get('errors')[:2]}" if diag.get("errors") else "")
     )
+    if diag.get("customSelectors"):
+        line += (f" | custom_selectors={diag['customSelectors']}"
+                 f"({'used' if diag.get('usedCustom') else 'unused'})")
+    if diag.get("healed"):
+        line += f" | HEALED={diag.get('healedSelectors')}"
+    elif diag.get("discovery"):
+        line += f" | discovery={diag['discovery']}"
+    if diag.get("errors"):
+        line += f" | errors={diag['errors'][:2]}"
+    return line
 
 
 # --------------------------------------------------------------------------
@@ -567,7 +882,9 @@ class MessageTracker:
 
 
 __all__ = [
-    "CHAT_EXTRACT_JS", "LEGACY_EXTRACT_JS", "MessageTracker", "extract",
-    "extract_with_diag", "legacy_extract", "dump_dom", "describe_diag",
-    "norm_text",
+    "CHAT_EXTRACT_JS", "LEGACY_EXTRACT_JS", "MessageTracker", "apply_selectors",
+    "coerce_selectors", "custom_selectors", "describe_diag", "dump_dom",
+    "extract", "extract_with_diag", "learned_selectors", "legacy_extract",
+    "load_selector_config", "merge_selector_dicts", "norm_text",
+    "reset_learned", "save_suggestion", "selector_config_path",
 ]

@@ -353,3 +353,45 @@ Kivabe debug korben (login lagbe na):
 
 Test:  python test_chat_detect.py     (47 ta check)
 ================================================================================
+
+================================================================================
+NOTUN — SITE ER DESIGN CHANGE HOLE BOT NIJEI THIK KORE NEY (v2.3)
+================================================================================
+Chitchat.gg kokhono kokhono nijer HTML/class bodle dey. Age seta hole bot
+"andha" hoye jeto (SMS dekhto na, reply ditona). Ekhon 3 ta layer ache:
+
+  1. RUNTIME SELF-HEALING (nijei kore, kichu korte hobe na)
+     * Built-in selector gulo kono ekta na mille, bot page tar markup
+       porikkha kore nijei notun selector ber kore ney
+       (browser/selector_doctor.py), sei selector diye SMS pore, ar
+       porer poll theke seta mone rakhe.
+     * Log e dekhabe:  [Detect] chat markup CHANGED — the bot healed itself
+     * Bhalo kore kaj korte thakle ki hoyeche jante parben:
+         logs/selector_suggestion_*.json  file ta save hoy — oi file ta
+         dekhle bujhben kon selector dhora poreche.
+
+  2. NIJE HATE KORBEN (recommended — permanent fix)
+     * Chat page browser e khulun -> right-click -> Save as ->
+       "Webpage, HTML only"  -> dhoren chat_page.html
+     * Tarpor:
+         python tools/chat_detect_debug.py --html chat_page.html --suggest
+             -> bot ki ki porte parche + notun selector gulo dekhabe
+         python tools/chat_detect_debug.py --html chat_page.html --explain
+             -> kon candidate kothay theke elo, score koto
+         python tools/chat_detect_debug.py --html chat_page.html --save
+             -> config/chat_selectors.json e likhe dibe (code change lagbe na!)
+         python tools/chat_detect_debug.py --html chat_page.html --offline --suggest
+             -> Playwright/node kichu na thakle o cholbe (khali standard library)
+     * config/chat_selectors.json muche dile abar purono built-in selector e
+       fire jabe. Backup thake: chat_selectors.json.bak
+
+  3. AUTOMATIC SAVE (chaile)
+     * EVA_SELECTOR_AUTOSAVE=1 set korle runtime e je selector pay, seta nijei
+       config/chat_selectors.json e likhe rakhbe.
+     * Onno kono path e config rakhben?  EVA_CHAT_SELECTORS=C:\path\file.json
+
+  Ekti bipod noy: page ekta chat page na hole (landing page, sidebar menu,
+  article) bot kichu "guess" kore reply kore na — doctor shei page gulo
+  reject kore dey. Test: python test_selector_doctor.py  (105 ta check)
+
+================================================================================

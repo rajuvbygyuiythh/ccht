@@ -10,3 +10,7 @@ data/logs/*.log*
 
 # local reference copy of the uploaded snapshot zip
 _source/
+
+# selector doctor / detection artifacts (runtime)
+logs/
+config/chat_selectors.json.bak
